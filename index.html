@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FloatChat - AI Ocean Data Explorer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E🌊%3C/text%3E%3C/svg%3E">
+    <style>
+        :root {
+            --primary: #1e40af; --primary-light: #3b82f6; --secondary: #64748b; --success: #10b981; --warning: #f59e0b; --error: #ef4444; --bg-primary: #0f172a; --bg-secondary: #111827; --bg-tertiary: #1f2a37; --text-primary: #f9fafb; --text-secondary: #e5e7eb; --text-muted: #94a3b8; --border: #374151; --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1); --border-radius: 12px; --transition: all 0.2s ease;
+        }
+        .hidden { display: none !important; } * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%); color: var(--text-primary); min-height: 100vh; overflow-x: hidden; }
+        #loading-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-primary); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.5s ease; }
+        .loading-spinner { width: 48px; height: 48px; border: 3px solid rgba(59, 130, 246, 0.2); border-top: 3px solid var(--primary-light); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1.5rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { color: var(--text-secondary); font-size: 1.1rem; }
+        .app-container { position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 420px; opacity: 0; transition: opacity 0.5s ease; pointer-events: none;}
+        .app-container.loaded { opacity: 1; pointer-events: auto; }
+        .app-header { grid-column: 1 / -1; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); padding: 1rem 2rem; border-bottom: 1px solid var(--border); z-index: 10; font-weight: 600; }
+        .main-content { grid-column: 1 / 2; grid-row: 2 / 3; position: relative; background: var(--bg-secondary); }
+        #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #111827; }
+        #selection-box { position: absolute; background: rgba(59, 130, 246, 0.2); border: 1px dashed var(--primary-light); pointer-events: none; }
+        .map-controls { position: absolute; top: 1rem; right: 1rem; z-index: 10; display: flex; flex-direction: column; gap: 0.5rem; }
+        .map-btn { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; cursor: pointer; transition: var(--transition); }
+        .map-btn:hover, .map-btn.active { background: var(--primary-light); border-color: var(--primary); }
+        .avatar-container { position: absolute; bottom: 1rem; left: 1rem; width: 300px; height: 300px; border: 2px solid var(--border); border-radius: var(--border-radius); overflow: hidden; background: rgba(15,23,42,0.5); backdrop-filter: blur(5px); }
+        .subtitles-overlay { position: absolute; left: 50%; bottom: 1rem; transform: translateX(-50%); background: rgba(0,0,0,.65); color: #fff; padding: .6rem .9rem; border-radius: 10px; max-width: 88%; text-align: center; z-index: 20; pointer-events: none; }
+        .sidebar { grid-column: 2 / 3; grid-row: 2 / 3; background: var(--bg-secondary); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+        .sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0;}
+        .tab-btn { flex: 1; padding: 0.75rem; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-weight: 500; }
+        .tab-btn.active { color: var(--text-primary); background: var(--bg-tertiary); border-bottom: 2px solid var(--primary-light); }
+        .sidebar-content { flex: 1; overflow: hidden; position: relative; }
+        .tab-pane { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: 1rem; overflow-y: auto; opacity: 0; visibility: hidden; transition: opacity 0.2s ease; }
+        .tab-pane.active { opacity: 1; visibility: visible; }
+        .pane-title { font-weight: 600; color: var(--text-secondary); margin-bottom: 0.75rem; }
+        .debug-content, .chat-messages { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); white-space: pre-wrap; word-break: break-all; }
+        .debug-entry { border-left: 3px solid var(--secondary); padding-left: 1rem; margin-bottom: 1rem; }
+        .debug-entry.decision { border-color: var(--primary-light); } .debug-entry.tool_call { border-color: var(--warning); } .debug-entry.success { border-color: var(--success); } .debug-entry.error { border-color: var(--error); }
+        .debug-title { font-weight: 600; margin-bottom: 0.25rem; }
+        .debug-data { background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; max-height: 150px; overflow-y: auto; }
+        .message { margin-bottom: 1rem; padding: 0.75rem; border-radius: 8px; background: rgba(255, 255, 255, 0.05); }
+        .message.ai { border-left: 3px solid var(--primary-light); } .message.user { border-left: 3px solid var(--success); }
+        .message-author { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; color: var(--text-secondary); }
+        .message-content { color: var(--text-primary); line-height: 1.4; }
+        .app-footer { grid-column: 1 / -1; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(10px); padding: 1rem 2rem; display: flex; justify-content: center; gap: 1rem; border-top: 1px solid var(--border); z-index: 10;}
+        .footer-btn { width: 48px; height: 48px; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .footer-btn.end-call { background: var(--error); color: white; }
+        .floating-ptt { position: fixed; right: 436px; bottom: 88px; z-index: 1100; pointer-events: none; }
+        .floating-ptt .container { pointer-events: auto; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); padding: 8px 10px; border-radius: 14px; backdrop-filter: blur(8px); display: flex; align-items: center; gap: 0.5rem; }
+        .push-to-talk-btn { width: 56px; height: 56px; border: 3px solid var(--primary-light); border-radius: 50%; background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+        .push-to-talk-btn:hover { background: rgba(59, 130, 246, 0.1); }
+        .push-to-talk-btn.recording { background: var(--error); border-color: var(--error); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .speech-status { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8rem; margin-bottom: 0.5rem; opacity: 0; pointer-events: none; }
+        @media (max-width: 992px) { .app-container { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto auto; } .sidebar { grid-column: 1 / -1; grid-row: 3 / 4; border-left: none; border-top: 1px solid var(--border); max-height: 40vh; } .main-content { grid-column: 1 / -1; grid-row: 2 / 3; } .floating-ptt { right: 16px; bottom: 88px; } }
+    </style>
+    <!-- Dependencies: Deck.gl, Three.js, and D3 for color scales -->
+    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
+    <script src="https://d3js.org/d3-color.v3.min.js"></script>
+    <script src="https://d3js.org/d3-interpolate.v3.min.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v3.min.js"></script>
+    <script src="https://d3js.org/d3-scale.v4.min.js"></script>
+    <script src="https://d3js.org/d3-array.v3.min.js"></script>
+    <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.149.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.149.0/examples/jsm/", "lipsync-en": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.2/modules/lipsync-en.mjs" } }
+    </script>
+</head>
+<body>
+    <div id="loading-screen" class="loading-screen"><div class="loading-spinner"></div><div class="loading-text">Calibrating sensors and loading AI...</div></div>
+    <div id="app-container" class="app-container">
+        <header class="app-header">FloatChat - AI Ocean Data Agent</header>
+        <main class="main-content">
+            <div id="map"></div>
+            <div id="selection-box" class="hidden"></div>
+            <div class="map-controls">
+                <button id="select-area-btn" class="map-btn" title="Select Area">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3H3C2.44772 3 2 3.44772 2 4V20C2 20.5523 2.44772 21 3 21H21C21.5523 21 22 20.5523 22 20V4C22 3.44772 21.5523 3 21 3Z"/><path d="M7 3V21"/><path d="M17 3V21"/><path d="M2 12H22"/><path d="M2 7H7"/><path d="M2 17H7"/><path d="M17 17H22"/><path d="M17 7H22"/></svg>
+                </button>
+            </div>
+            <div id="avatar-container" class="avatar-container"></div>
+            <div id="subtitles-overlay" class="subtitles-overlay hidden"></div>
+        </main>
+        <aside class="sidebar">
+            <div class="sidebar-tabs">
+                <button class="tab-btn active" data-tab="chat">Chat History</button>
+                <button class="tab-btn" data-tab="debug">Agent Activity</button>
+            </div>
+            <div class="sidebar-content">
+                <div id="chat-pane" class="tab-pane active"><div id="chat-messages" class="chat-messages"></div></div>
+                <div id="debug-pane" class="tab-pane"><h3 class="pane-title">Debug Log</h3><div id="debug-content" class="debug-content">Agent is idle.</div></div>
+            </div>
+        </aside>
+        <footer class="app-footer"><button id="end-session-btn" class="footer-btn end-call" title="End Session"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-1.66 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11-.53-.29-.71l-2.48 2.48c-.18.18-.43.29-.71.29-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg></button></footer>
+        <div class="floating-ptt"><div class="container"><button id="push-to-talk-btn" class="push-to-talk-btn" title="Hold to speak"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"/></svg></button><div id="speech-status" class="speech-status"></div></div></div>
+    </div>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+        import { LipsyncEn } from 'lipsync-en';
+        
+        // --- START OF UNABRIDGED TALKINGHEAD CLASS ---
+        class TalkingHead {
+            constructor(node, opt = {}) { this.nodeAvatar = node; this.opt = { ttsEndpoint: null, lipsyncLang: 'en', cameraView: 'upper', ...opt }; this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); const w = Math.max( this.nodeAvatar.clientWidth || 640, 640 ); const h = Math.max( this.nodeAvatar.clientHeight || 360, 360 ); this.renderer.setPixelRatio(window.devicePixelRatio); this.renderer.setSize(w, h); this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.sortObjects = false; this.nodeAvatar.appendChild(this.renderer.domElement); this.camera = new THREE.PerspectiveCamera(25, w / h, 0.1, 100); this.scene = new THREE.Scene(); this.scene.add(new THREE.AmbientLight(0xffffff, 0.8)); const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); directionalLight.position.set(0.5, 1, 1).normalize(); this.scene.add(directionalLight); this.controls = new OrbitControls(this.camera, this.renderer.domElement); this.controls.enableZoom = false; this.controls.enablePan = false; this.controls.target.set(0, 1.6, 0); this.controls.enableDamping = true; this.controls.dampingFactor = 0.05; this.animClock = 0; this.animTimeLast = 0; this.avatar = null; this.armature = null; this.morphs = []; this.mixer = null; this.speechQueue = []; this.isSpeaking = false; this.isRunning = false; this.stateName = 'idle'; this.audioCtx = new AudioContext(); this.audioSpeechSource = null; this.lipsync = {}; this.visemeNames = [ 'viseme_sil', 'viseme_PP', 'viseme_FF', 'viseme_TH', 'viseme_DD', 'viseme_kk', 'viseme_CH', 'viseme_SS', 'viseme_nn', 'viseme_RR', 'viseme_aa', 'viseme_E', 'viseme_I', 'viseme_O', 'viseme_U' ]; this.poseTemplates = { 'side': { standing: true, props: { 'Hips.position': { x: 0, y: 1, z: 0 }, 'Hips.rotation': { x: -0.003, y: -0.017, z: 0.1 }, 'Spine.rotation': { x: -0.103, y: -0.002, z: -0.063 }, 'Spine1.rotation': { x: 0.042, y: -0.02, z: -0.069 }, 'Spine2.rotation': { x: 0.131, y: -0.012, z: -0.065 }, 'Neck.rotation': { x: 0.027, y: 0.006, z: 0 }, 'Head.rotation': { x: 0.077, y: -0.065, z: 0 }, 'LeftShoulder.rotation': { x: 1.599, y: 0.084, z: -1.77 }, 'LeftArm.rotation': { x: 1.364, y: 0.052, z: -0.044 }, 'LeftForeArm.rotation': { x: 0.002, y: -0.007, z: 0.331 }, 'LeftHand.rotation': { x: 0.104, y: -0.067, z: -0.174 }, 'LeftUpLeg.rotation': { x: 0.096, y: 0.209, z: 2.983 }, 'LeftLeg.rotation': { x: -0.053, y: 0.042, z: -0.017 }, 'LeftFoot.rotation': { x: 1.091, y: 0.15, z: 0.026 }, 'RightShoulder.rotation': { x: 1.541, y: 0.192, z: 1.775 }, 'RightArm.rotation': { x: 1.273, y: -0.352, z: -0.067 }, 'RightForeArm.rotation': { x: -0.011, y: -0.031, z: -0.357 }, 'RightHand.rotation': { x: -0.008, y: 0.312, z: -0.028 }, 'RightUpLeg.rotation': { x: -0.307, y: -0.219, z: 2.912 }, 'RightLeg.rotation': { x: -0.359, y: 0.164, z: 0.015 }, 'RightFoot.rotation': { x: 1.035, y: 0.11, z: 0.005 } } }, 'straight': { standing: true, props: { 'Hips.position': { x: 0, y: 0.989, z: 0.001 }, 'Hips.rotation': { x: 0.047, y: 0.007, z: -0.007 }, 'Spine.rotation': { x: -0.143, y: -0.007, z: 0.005 }, 'Spine1.rotation': { x: -0.043, y: -0.014, z: 0.012 }, 'Spine2.rotation': { x: 0.072, y: -0.013, z: 0.013 }, 'Neck.rotation': { x: 0.048, y: -0.003, z: 0.012 }, 'Head.rotation': { x: 0.05, y: -0.02, z: -0.017 }, 'LeftShoulder.rotation': { x: 1.62, y: -0.166, z: -1.605 }, 'LeftArm.rotation': { x: 1.275, y: 0.544, z: -0.092 }, 'LeftForeArm.rotation': { x: 0, y: 0, z: 0.302 }, 'LeftHand.rotation': { x: -0.225, y: -0.154, z: 0.11 }, 'RightShoulder.rotation': { x: 1.615, y: 0.064, z: 1.53 }, 'RightArm.rotation': { x: 1.313, y: -0.424, z: 0.131 }, 'RightForeArm.rotation': { x: 0, y: 0, z: -0.317 }, 'RightHand.rotation': { x: -0.158, y: -0.639, z: -0.196 }, 'LeftUpLeg.rotation': { x: -0.077, y: -0.058, z: 3.126 }, 'LeftLeg.rotation': { x: -0.252, y: 0.001, z: -0.018 }, 'LeftFoot.rotation': { x: 1.315, y: -0.064, z: 0.315 }, 'RightUpLeg.rotation': { x: -0.083, y: -0.032, z: 3.124 }, 'RightLeg.rotation': { x: -0.272, y: -0.003, z: 0.021 }, 'RightFoot.rotation': { x: 1.342, y: 0.076, z: -0.222 } } } }; this.animMoods = { neutral: { anims: [ { name: 'breathing', loop: -1, delay: 1500, dt: [1200, 500, 1000], vs: { chestInhale: [0.5, 0.5, 0] } }, { name: 'pose', loop: -1, alt: [ { p: 0.4, delay: [5000, 20000], dt: [2000], vs: { pose: ['side'] } }, { delay: [5000, 20000], dt: [2000], vs: { pose: ['straight'] } } ] }, { name: 'head', loop: -1, idle: { delay: [0, 1000], dt: [[200, 5000]], vs: { headRotateX: [[-0.04, 0.10]], headRotateY: [[-0.3, 0.3]], headRotateZ: [[-0.08, 0.08]] } }, talking: { delay: [0, 1000], dt: [[0, 1000, 0]], vs: { headRotateX: [[-0.05, 0.15, 1, 2]], headRotateY: [[-0.1, 0.1]], headRotateZ: [[-0.1, 0.1]] } } }, { name: 'eyes', loop: -1, delay: [200, 5000], dt: [[100, 500], [100, 5000, 2]], vs: { eyesRotateY: [[-0.6, 0.6]], eyesRotateX: [[-0.2, 0.6]] } }, { name: 'blink', loop: -1, delay: [1000, 8000], dt: [50, [100, 300], 100], vs: { eyeBlinkLeft: [1, 1, 0], eyeBlinkRight: [1, 1, 0] } }, { name: 'mouth', loop: -1, delay: [1000, 5000], dt: [[100, 500], [100, 5000, 2]], vs: { mouthRollLower: [[0, 0.3, 2]], mouthPucker: [[0, 0.3]] } } ] } }; this.animEmojis = { '😊': { name: 'smile', dt: [300, 1000], vs: { mouthSmile: [0.7], eyeSquintLeft: [0.8], eyeSquintRight: [0.8] } }, '😉': { name: 'wink', dt: [100, 200, 500], vs: { mouthSmile: [0.5, 0.5, 0], eyeBlinkRight: [1, 1, 0] } }, '😞': { name: 'sad', dt: [1000], vs: { browInnerUp: [0.7], mouthFrownLeft: [0.8], mouthFrownRight: [0.8] } }, '😡': { name: 'angry', dt: [500], vs: { browDownLeft: [1], browDownRight: [1], mouthFrownLeft: [1], mouthFrownRight: [1] } } }; this.animQueue = []; this.easing = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; this.poseBase = {}; this.poseTarget = {}; this.poseAvatar = {}; this.poseDelta = { props: {} }; this.poseWeightOnLeft = true; this.randomized = ['mouthStretchLeft', 'mouthStretchRight', 'mouthRollLower', 'mouthRollUpper', 'browDownLeft', 'browDownRight', 'browOuterUpLeft', 'browOuterUpRight', 'cheekPuff', 'cheekSquintLeft', 'cheekSquintRight']; this.animBaseline = {}; this.ikMesh = new THREE.SkinnedMesh(); window.addEventListener('resize', this.onResize.bind(this)); this.envLoaded = false; }
+            resumeAudio() { if (this.audioCtx && this.audioCtx.state === 'suspended') { this.audioCtx.resume(); } }
+            init() { this.lipsync[this.opt.lipsyncLang] = new LipsyncEn(); const rgbe = new RGBELoader(); const hdrUrl = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/studio_small_09_2k.hdr'; rgbe.load(hdrUrl, (tex) => { tex.mapping = THREE.EquirectangularReflectionMapping; this.scene.environment = tex; this.scene.background = tex; this.envLoaded = true; }, undefined, (e) => { this.scene.background = new THREE.Color(0x0f172a); }); }
+            fixMaterial(mat, owner) { if (!mat) return; const ownerName = (owner?.name || '').toLowerCase(); const matName = (mat.name || '').toLowerCase(); const tag = (ownerName + ' ' + matName); const isHairCard = /(hair|lash|eyelash|eyebrow|brow|beard|stubble|mustache)/i.test(tag); const isEyeCornea = /(cornea|eyemoisture|tear|tearline|eye_moisture|eye\-moisture)/i.test(tag); const isEyeIrisSclera = /(eye$|eyes$|iris|sclera|eyeball)/i.test(tag) && !isEyeCornea; const makeOpaqueSolid = (m) => { m.transparent = false; m.alphaTest = 0; m.opacity = 1; m.depthWrite = true; m.depthTest = true; m.blending = THREE.NormalBlending; m.side = THREE.FrontSide; m.needsUpdate = true; }; if (isEyeCornea) { mat.transparent = true; mat.alphaTest = 0.0; mat.opacity = Math.min(1, Math.max(0.2, mat.opacity ?? 0.35)); mat.depthWrite = false; mat.depthTest = true; mat.blending = THREE.NormalBlending; mat.side = THREE.FrontSide; mat.polygonOffset = true; mat.polygonOffsetFactor = -0.5; mat.polygonOffsetUnits = -1; mat.needsUpdate = true; return; } if (isHairCard) { mat.alphaTest = Math.max(mat.alphaTest || 0, 0.5); mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; mat.depthTest = true; mat.blending = THREE.NormalBlending; mat.side = THREE.FrontSide; mat.polygonOffset = true; mat.polygonOffsetFactor = 0.5; mat.polygonOffsetUnits = 1; mat.needsUpdate = true; return; } if (isEyeIrisSclera) { makeOpaqueSolid(mat); mat.polygonOffset = true; mat.polygonOffsetFactor = 0.25; mat.polygonOffsetUnits = 0.5; return; } const hasRGBA = !!(mat.map && mat.map.format === THREE.RGBAFormat); const looksTransparent = mat.transparent || (mat.opacity !== undefined && mat.opacity < 1) || hasRGBA; if (looksTransparent) { mat.alphaTest = Math.max(mat.alphaTest || 0, 0.5); mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; mat.depthTest = true; mat.blending = THREE.NormalBlending; mat.side = THREE.FrontSide; mat.needsUpdate = true; } else { makeOpaqueSolid(mat); } }
+            async showAvatar(avatar) { const loader = new GLTFLoader(); const gltf = await loader.loadAsync(avatar.url); this.armature = gltf.scene; this.armature.traverse(node => { if (node.isMesh || node.isSkinnedMesh) { if (Array.isArray(node.material)) { node.material = node.material.map(m => m.clone()); node.material.forEach(m => this.fixMaterial(m, node)); } else if (node.material) { node.material = node.material.clone(); this.fixMaterial(node.material, node); } if (node.material) { if (Array.isArray(node.material)) { node.material.forEach(m => { m.envMap = null; }); } else { node.material.envMap = null; } } const n = (node.name || '').toLowerCase(); if (/(cornea|eyemoisture|tear|tearline|eye_moisture|eye\-moisture)/i.test(n)) { node.renderOrder = 30; } else if (/(eye$|eyes$|iris|sclera|eyeball)/i.test(n)) { node.renderOrder = 20; } else if (/(lash|eyelash|brow|eyebrow)/i.test(n)) { node.renderOrder = 15; } else { node.renderOrder = 10; } if (node.morphTargetDictionary) { this.morphs.push(node); } node.frustumCulled = false; } }); if (!this.morphs.length) { throw new Error("No morph targets found on model."); } this.poseBase = this.poseFactory(this.poseTemplates.straight); this.poseTarget = this.poseFactory(this.poseTemplates.straight); this.poseAvatar.props = {}; this.poseDelta.props = {}; const posePropNames = new Set(); Object.values(this.poseTemplates).forEach(x => { Object.keys(this.propsToThreeObjects(x.props)).forEach(y => posePropNames.add(y)); }); for (const key of posePropNames) { const [boneName, propName] = key.split('.'); const bone = this.armature.getObjectByName(boneName); if (bone && bone[propName]) { this.poseAvatar.props[key] = bone[propName]; if(this.poseBase.props[key]) { this.poseAvatar.props[key].copy(this.poseBase.props[key]); } else { this.poseBase.props[key] = this.poseAvatar.props[key].clone(); } if(this.poseTarget.props[key]) { this.poseTarget.props[key].t = this.animClock; this.poseTarget.props[key].d = 2000; } if(propName === 'quaternion' || propName === 'scale') { this.poseDelta.props[key] = propName === 'quaternion' ? new THREE.Euler() : new THREE.Vector3(); } } } this.mixer = new THREE.AnimationMixer(this.armature); let idleClip = gltf.animations.find(clip => clip.name.toLowerCase() === 'idle') || gltf.animations[0]; if(idleClip) { this.mixer.clipAction(idleClip).play(); } this.scene.add(this.armature); this.setView(this.opt.cameraView); this.start(); }
+            propsToThreeObjects(p) { const r = {}; for (let [key, val] of Object.entries(p)) { const ids = key.split('.'); let v; let x = val.x ?? 0; let y = val.y ?? 0; let z = val.z ?? 0; if (ids[1] === 'position' || ids[1] === 'scale') { v = new THREE.Vector3(x, y, z); } else if (ids[1] === 'rotation') { key = ids[0] + '.quaternion'; v = new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, 'XYZ')); } if (v) r[key] = v; } return r; }
+            poseFactory(template, ms = 2000) { const o = { template: template, props: this.propsToThreeObjects(template.props) }; for (const v of Object.values(o.props)) { v.t = this.animClock; v.d = ms; } return o; }
+            mirrorPose(p) { const r = {}; for (let [key, v] of Object.entries(p)) { if (v.isQuaternion) { if (key.startsWith('Left')) { key = 'Right' + key.substring(4); } else if (key.startsWith('Right')) { key = 'Left' + key.substring(5); } v.x *= -1; v.w *= -1; } r[key] = v.clone(); r[key].t = v.t; r[key].d = v.d; } return r; }
+            setPoseFromTemplate(templateName, ms=2000) { const template = this.poseTemplates[templateName]; if(!template) return; const isSameTemplate = this.poseCurrentTemplate && template.props === this.poseCurrentTemplate.props; this.poseBase = this.poseFactory(this.poseCurrentTemplate || this.poseTemplates.straight, ms); this.poseTarget = this.poseFactory(template, ms); this.poseCurrentTemplate = template; if ((!isSameTemplate && !this.poseWeightOnLeft) || (isSameTemplate && this.poseWeightOnLeft)) { this.poseTarget.props = this.mirrorPose(this.poseTarget.props); this.poseWeightOnLeft = !this.poseWeightOnLeft; } }
+            startIdleAnimations() { this.animMoods.neutral.anims.forEach(animTemplate => { this.animQueue.push(this.animFactory(animTemplate)); }); }
+            stopIdleAnimations() { this.animQueue = this.animQueue.filter(anim => anim.loop !== -1 && anim.template.name !== 'pose'); }
+            animFactory(t) { const o = { template: t, ts: [0], vs: {}, loop: t.loop }; let a = t; if (a[this.stateName]) { a = a[this.stateName]; } if (a.alt) { let b = a.alt[0]; if (a.alt.length > 1) { const coin = Math.random(); let p = 0; for (let i = 0; i < a.alt.length; i++) { p += a.alt[i].p || (1 - p) / (a.alt.length - i); if (coin < p) { b = a.alt[i]; break; } } } a = b; } const delay = a.delay ? (Array.isArray(a.delay) ? this.gaussianRandom(...a.delay) : a.delay) : 0; const dt = a.dt || t.dt; dt.forEach((x, i) => o.ts[i + 1] = o.ts[i] + (Array.isArray(x) ? this.gaussianRandom(...x) : x)); o.ts = o.ts.map(x => this.animClock + delay + x); const vs = a.vs || t.vs; Object.entries(vs).forEach(([mt, v_seq]) => { o.vs[mt] = [null, ...v_seq.map(x => Array.isArray(x) ? this.gaussianRandom(...x) : x)]; while (o.vs[mt].length - 1 < o.ts.length) o.vs[mt].push(o.vs[mt].at(-1)); }); return o; }
+            gaussianRandom(start, end, skew=1, samples=3) { let r = 0; for(let i=0; i<samples; i++) r += Math.random(); return start + Math.pow(r/samples,skew) * (end - start); }
+            setView(view) { let z = 2.5; if (view === 'upper') z = 1.8; this.camera.position.set(0, 1.6, z); this.controls.update(); }
+            onResize() { if (!this.nodeAvatar.clientWidth || !this.nodeAvatar.clientHeight) return; this.camera.aspect = this.nodeAvatar.clientWidth / this.nodeAvatar.clientHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(this.nodeAvatar.clientWidth, this.nodeAvatar.clientHeight); }
+            start() { if (this.isRunning) return; this.isRunning = true; this.animTimeLast = performance.now(); this.startIdleAnimations(); this.renderer.setAnimationLoop(this.animate.bind(this)); }
+            animate() { const now = performance.now(); const dt = now - this.animTimeLast; this.animClock += dt; this.animTimeLast = now; if (this.mixer) this.mixer.update(dt / 1000); this.controls.update(); if (Math.random() < 0.1) { const randomizedMs = this.randomized[Math.floor(Math.random() * this.randomized.length)]; const v = this.getValue(randomizedMs); const vb = this.getBaselineValue(randomizedMs); if (Math.abs(v - vb) < 0.01) { const randomizedV = (this.mood?.baseline?.[randomizedMs] || 0) + Math.random() / 5; this.setBaselineValue(randomizedMs, randomizedV); } } const frameMorphAcc = new Map(); for (let [mt, x] of Object.entries(this.animBaseline)) { const v = this.getValue(mt); const restrain = (this.isSpeaking && mt.startsWith("mouth")) ? 3 : 1; const target = x.target / restrain; if (Math.abs(v - target) > 0.01) { if (x.t0 === undefined) { x.t0 = this.animClock; x.v0 = v; } let delay = 1000; const val = this.valueAnimationSeq([x.t0, x.t0 + delay], [x.v0, target], this.animClock); frameMorphAcc.set(mt, val); } else { x.t0 = undefined; frameMorphAcc.set(mt, target); } } this.updatePoseBase(); for (let i = 0; i < this.animQueue.length; i++) { const anim = this.animQueue[i]; if (this.animClock >= anim.ts[0]) { Object.entries(anim.vs).forEach(([mt, vs]) => { if (mt === 'pose' && this.animClock >= anim.ts[1]) { this.setPoseFromTemplate(vs[1]); anim.ts = [Infinity]; return; } if (vs[0] === null) vs[0] = this.getValue(mt); const vv = this.valueAnimationSeq(anim.ts, vs, this.animClock); const prev = frameMorphAcc.get(mt) ?? -Infinity; if (vv > prev) frameMorphAcc.set(mt, vv); }); if (this.animClock >= anim.ts.at(-1)) { if (anim.loop === -1) { if (this.stateName === 'idle' || (this.stateName === 'talking' && (anim.template.name === 'head' || anim.template.name === 'eyes')) ) { const restrain = (this.stateName === 'talking' && (anim.template.name === 'head' || anim.template.name === 'eyes')) ? 4 : 1; this.animQueue[i] = this.animFactory(anim.template, anim.loop, 1, 1 / restrain); } else { this.animQueue.splice(i--, 1); } } else { this.animQueue.splice(i--, 1); } } } } this.updatePoseDelta(frameMorphAcc); for (const mesh of this.morphs) { for (const name in mesh.morphTargetDictionary) { const idx = mesh.morphTargetDictionary[name]; const value = frameMorphAcc.get(name); if (value !== undefined && typeof value === 'number' && !isNaN(value)) { mesh.morphTargetInfluences[idx] = Math.min(1, Math.max(0, value)); } else if (!this.isViseme(name)) { const current = mesh.morphTargetInfluences[idx] || 0; if (current > 0.001) { mesh.morphTargetInfluences[idx] = Math.max(0, current * 0.95); } else { mesh.morphTargetInfluences[idx] = 0; } } } } if(this.armature) { const box = new THREE.Box3().setFromObject(this.armature); const ltoe = this.armature.getObjectByName('LeftToeBase'); const rtoe = this.armature.getObjectByName('RightToeBase'); if (ltoe && rtoe) { const ltoePos = new THREE.Vector3(); ltoe.getWorldPosition(ltoePos); const rtoePos = new THREE.Vector3(); rtoe.getWorldPosition(rtoePos); const hips = this.armature.getObjectByName('Hips'); if (hips) { hips.position.y -= box.min.y / 2; hips.position.x -= (ltoePos.x + rtoePos.x) / 4; hips.position.z -= (ltoePos.z + rtoePos.z) / 2; } } } this.renderer.render(this.scene, this.camera); }
+            updatePoseBase() { for (const [key, v] of Object.entries(this.poseTarget.props)) { const o = this.poseAvatar.props[key]; if (!o || !this.poseBase.props[key]) continue; const alpha = Math.min(1, (this.animClock - v.t) / v.d); if (alpha >= 1 || !this.poseBase.props.hasOwnProperty(key)) { o.copy(v); } else if (o.isQuaternion) { o.copy(this.poseBase.props[key]).slerp(v, this.easing(alpha)); } else if (o.isVector3) { o.copy(this.poseBase.props[key]).lerp(v, this.easing(alpha)); } } }
+            updatePoseDelta(morphs) { const euler = this.poseDelta.props['Head.quaternion']; if(euler) euler.set(morphs.get('headRotateX')||0, morphs.get('headRotateY')||0, morphs.get('headRotateZ')||0); const q = new THREE.Quaternion().setFromEuler(euler || new THREE.Euler()); if(this.poseAvatar.props['Head.quaternion']) this.poseAvatar.props['Head.quaternion'].multiply(q); const scale = morphs.get('chestInhale')||0; if(this.poseAvatar.props['Spine1.scale']) { const s = 1 + scale; this.poseAvatar.props['Spine1.scale'].set(s,s,s); } }
+            valueAnimationSeq(ts, vs, t) { if (!ts || ts.length < 2) return 0; if (t <= ts[0]) return vs[1]; if (t >= ts.at(-1)) return vs.at(-1); let i = 0; for (i = 0; i < ts.length - 2; i++) { if (t >= ts[i] && t < ts[i+1]) { break; } } const startTime = ts[i]; const endTime = ts[i+1]; const startValue = vs[i+1]; const endValue = vs[i+2]; if (endTime === startTime) return startValue; const progress = (t - startTime) / (endTime - startTime); return startValue + (endValue - startValue) * this.easing(progress); }
+            isViseme(name) { return name.startsWith('viseme_'); }
+            getBaselineValue(mt) { return (this.animBaseline.hasOwnProperty(mt) ? this.animBaseline[mt].target : 0); }
+            setBaselineValue(mt, v) { if (v === null) { if (this.animBaseline.hasOwnProperty(mt)) delete this.animBaseline[mt]; } else { this.animBaseline[mt] = { target: v, t0: undefined, v0: 0 }; } }
+            getValue(mt) { if (mt.startsWith('headRotate')) { const axis = mt.charAt(mt.length - 1).toLowerCase(); return this.poseDelta.props['Head.quaternion']?.[axis] || 0; } if (mt === 'chestInhale') { return (this.poseDelta.props['Spine1.scale']?.x || 0) * 20; } const mesh = this.morphs[0]; return (mesh && mesh.morphTargetDictionary[mt] !== undefined) ? mesh.morphTargetInfluences[mesh.morphTargetDictionary[mt]] : 0; }
+            speakText(text) { if (this.isSpeaking) { this.speechQueue.push({ type: 'text', content: text }); return; } this.processSpeechItem({ type: 'text', content: text }); }
+            speakEmoji(emojiChar) { this.speechQueue.push({ type: 'emoji', content: this.animEmojis[emojiChar] }); if(!this.isSpeaking) this.startSpeaking(); }
+            async processSpeechItem(item) { this.isSpeaking = true; this.stateName = 'talking'; this.stopIdleAnimations(); this.resetLips(); if (item.type === 'text') { this.speakWithHands(0, 0.5); try { const preprocessedText = this.lipsync.en.preProcessText(sanitizeForTTS(item.content)); const response = await fetch(this.opt.ttsEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: preprocessedText }) }); if (!response.ok) throw new Error(`TTS Error: ${response.status} ${await response.text()}`); const data = await response.json(); if (!data.audioContent || !data.timepoints) throw new Error("Invalid TTS response format."); await this.playAudioWithVisemes(data.audioContent, data.timepoints); } catch (error) { console.error("TTS failed:", error); this.finishSpeaking(); } } else if (item.type === 'emoji') { const anim = this.animFactory(item.content); this.animQueue.push(anim); setTimeout(() => this.finishSpeaking(), anim.ts.at(-1) - this.animClock); } }
+            async playAudioWithVisemes(base64Audio, timepoints) { if (this.audioCtx.state === 'suspended') await this.audioCtx.resume(); const audioData = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0)).buffer; const audioBuffer = await this.audioCtx.decodeAudioData(audioData); const LEAD_IN_MS = 80; const MIN_WORD_MS = 220; const MIN_VISEME_MS = 90; const MAX_VISEMES_PER_WORD = 3; const PEAK_FRACTION = 0.45; const AMPLITUDE = 0.6; const audioStartAnimClock = this.animClock + 150; const sortedTP = [...timepoints].sort((a, b) => parseInt(a.mark_name) - parseInt(b.mark_name)); const condenseVisemes = (visemes, times, durations) => { const out = []; for (let i = 0; i < visemes.length; i++) { const v = visemes[i]; if (v === 'sil') continue; out.push({ v, t: times[i], d: durations[i] }); } if (!out.length) return out; const merged = []; for (const seg of out) { const last = merged[merged.length - 1]; if (last && last.v === seg.v) { last.d += seg.d; } else { merged.push({ ...seg }); } } if (merged.length > MAX_VISEMES_PER_WORD) { const sortedByDur = [...merged].sort((a, b) => b.d - a.d).slice(0, MAX_VISEMES_PER_WORD); sortedByDur.sort((a, b) => a.t - b.t); return sortedByDur; } return merged; }; sortedTP.forEach((tp, idx) => { const nextTp = sortedTP[idx + 1]; const wordStartMs = tp.time_seconds * 1000; const wordEndMs = nextTp ? (nextTp.time_seconds * 1000) : (audioBuffer.duration * 1000); let wordDurationMs = Math.max(MIN_WORD_MS, wordEndMs - wordStartMs); if (wordDurationMs <= 0) return; const visemeData = this.lipsync.en.wordsToVisemes(tp.word); if (!visemeData.visemes.length) return; const condensed = condenseVisemes( visemeData.visemes, visemeData.times, visemeData.durations ); if (!condensed.length) return; const totalRel = condensed.reduce((sum, s) => sum + s.d, 0) || 1; for (let i = 0; i < condensed.length; i++) { const { v, t, d } = condensed[i]; const visemeName = "viseme_" + v; if (this.morphs[0]?.morphTargetDictionary[visemeName] === undefined) continue; const relStart = t; const relDur = d; const absStart = wordStartMs + (relStart / totalRel) * wordDurationMs; let absDur = (relDur / totalRel) * wordDurationMs; if (absDur < MIN_VISEME_MS) { const extraNeeded = MIN_VISEME_MS - absDur; const remaining = (wordStartMs + wordDurationMs) - (absStart + absDur); const grant = Math.min(remaining, extraNeeded); absDur += Math.max(0, grant); if (absDur < MIN_VISEME_MS * 0.8) continue; } const startTime = audioStartAnimClock + absStart - LEAD_IN_MS; const peakTime = startTime + LEAD_IN_MS + absDur * PEAK_FRACTION; const endTime = startTime + LEAD_IN_MS + absDur; if (endTime - startTime < 50) continue; this.animQueue.push({ ts: [startTime, peakTime, endTime], vs: { [visemeName]: [null, AMPLITUDE, 0] } }); } }); if (this.audioSpeechSource) { this.audioSpeechSource.stop(); } this.audioSpeechSource = this.audioCtx.createBufferSource(); this.audioSpeechSource.buffer = audioBuffer; this.audioSpeechSource.connect(this.audioCtx.destination); const startAt = this.audioCtx.currentTime + 0.150; this.audioSpeechSource.start(startAt); if (typeof scheduleAISubtitles === 'function') { scheduleAISubtitles(sortedTP, audioBuffer.duration, startAt); } this.audioSpeechSource.onended = () => this.finishSpeaking(); }
+            resetLips() { this.animQueue = this.animQueue.filter(a => !Object.keys(a.vs)[0].startsWith('viseme_')); this.visemeNames.forEach(name => { const current = this.getValue(name); if (current > 0.001) { const now = this.animClock; this.animQueue.push({ ts: [now, now + 60], vs: { [name]: [current, 0] }}); }}); }
+            startSpeaking() { if (this.isSpeaking || !this.speechQueue.length) return; this.processSpeechItem(this.speechQueue.shift()); }
+            finishSpeaking() { this.isSpeaking = false; this.stateName = 'idle'; this.resetLips(); this.startIdleAnimations(); if (this.speechQueue.length > 0) this.startSpeaking(); }
+            stopSpeaking() { if (this.audioSpeechSource) { this.audioSpeechSource.onended = null; this.audioSpeechSource.stop(); this.audioSpeechSource = null; } this.speechQueue = []; this.finishSpeaking(); }
+            speakWithHands(delay=0, prob=0.5) { if (Math.random() > prob) return; const dt = [100 + Math.round(Math.random() * 500)]; const moveto = [{ duration: 1000, props: { "LeftHand.rotation": { x: 0, y: -1 - Math.random(), z: 0 }, "RightHand.rotation": { x: 0, y: 1 + Math.random(), z: 0 }, "LeftArm.rotation": {x: 1.5, y:0, z:0}, "RightArm.rotation": {x: 1.5, y:0, z:0}, "LeftForeArm.rotation": {x: 0, y:0, z:1}, "RightForeArm.rotation": {x: 0, y:0, z:-1}, } }]; dt.push(1000 + Math.round(Math.random() * 500)); moveto.push({ duration: 2000, props: {} }); ["LeftArm", "LeftForeArm", "RightArm", "RightForeArm", "LeftHand", "RightHand"].forEach(x => { moveto[1].props[x + '.rotation'] = null; }); const anim = this.animFactory({ name: 'talkinghands', delay: delay, dt: dt, vs: { moveto: moveto } }); this.animQueue.push(anim); }
+        }
+        // --- END OF UNABRIDGED TALKINGHEAD CLASS ---
+
+        // --- Application State & Constants ---
+        let avatar, isModelLoaded = false, messages = [], isRecording = false, speechRecognition, isWaitingForAIResponse = false;
+        let deckgl, isSelectingArea = false, selectionStart = null;
+
+        const BACKEND_URL = 'https://oceanographybot.bhansalimanan55.workers.dev/';
+        const TTS_ENDPOINT = 'https://us-central1-msc-notif.cloudfunctions.net/gcp-tts-rate-limited';
+        
+        // FIX 1: Added ?morphTargets=Oculus+Visemes to the URL
+        // This requests the specific mouth shape data (visemes) needed for lip-syncing.
+        const AVATAR_URL = 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=Oculus+Visemes';
+        
+        let EMOJI_CHAR, NON_TTS;
+        try { EMOJI_CHAR = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u; NON_TTS = /[^\p{L}\p{N}\p{P}\p{Z}\n\r\t]/gu; } catch { EMOJI_CHAR = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u; NON_TTS = /[^A-Za-z0-9\s.,!?;:'"()[\]{}<>@#$%^&*_\-+=/\\|~`]/g; }
+        function extractEmojisAndSanitize(text = "") { const chars = Array.from(text); const emojis = []; const noEmoji = chars.map(ch => { if (EMOJI_CHAR.test(ch)) { emojis.push(ch); return ""; } return ch; }).join(""); let clean = noEmoji.replace(NON_TTS, "").replace(/\s{2,}/g, " ").trim(); return { clean, emojis }; }
+        function sanitizeForTTS(s) { return extractEmojisAndSanitize(s).clean; }
+
+        const dom = { loadingScreen: document.getElementById('loading-screen'), appContainer: document.getElementById('app-container'), avatarContainer: document.getElementById('avatar-container'), chatMessages: document.getElementById('chat-messages'), subtitlesOverlay: document.getElementById('subtitles-overlay'), pushToTalkBtn: document.getElementById('push-to-talk-btn'), speechStatus: document.getElementById('speech-status'), debugPane: document.getElementById('debug-content'), endSessionBtn: document.getElementById('end-session-btn'), tabs: document.querySelectorAll('.tab-btn'), tabPanes: document.querySelectorAll('.tab-pane'), selectAreaBtn: document.getElementById('select-area-btn'), selectionBox: document.getElementById('selection-box') };
+        let interimTranscript = '', finalTranscript = '';
+
+        async function init() {
+            setupEventListeners();
+            setupSpeechRecognition();
+            loadModelInBackground();
+            initMap();
+        }
+
+        function setupEventListeners() {
+            dom.endSessionBtn.addEventListener('click', endSession);
+            dom.pushToTalkBtn.addEventListener('mousedown', startRecording);
+            dom.pushToTalkBtn.addEventListener('mouseup', stopRecording);
+            dom.pushToTalkBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(e); }, { passive: false });
+            dom.pushToTalkBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(e); });
+            window.addEventListener('resize', () => { if (avatar) avatar.onResize(); });
+            dom.tabs.forEach(tab => tab.addEventListener('click', () => {
+                dom.tabs.forEach(t => t.classList.remove('active'));
+                dom.tabPanes.forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tab}-pane`).classList.add('active');
+            }));
+            dom.selectAreaBtn.addEventListener('click', toggleAreaSelection);
+        }
+        
+        function initMap() {
+            deckgl = new deck.DeckGL({
+                container: 'map',
+                initialViewState: { longitude: 80, latitude: 15, zoom: 3.5, pitch: 45, bearing: 0 },
+                controller: true,
+                getTooltip: ({ object }) => object && (object.pressure ? `Pressure: ${object.pressure.toFixed(0)} dbar\nValue: ${object.value.toFixed(2)}` : `Float ID: ${object.platform}`),
+                layers: [createBaseMapLayer()],
+                onDragStart: handleDragStart,
+                onDrag: handleDrag,
+                onDragEnd: handleDragEnd
+            });
+        }
+
+        function createBaseMapLayer() {
+            return new deck.TileLayer({ id: 'openstreetmap-basemap', data: 'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png', minZoom: 0, maxZoom: 19, tileSize: 256, renderSubLayers: props => { const {bbox: {west, south, east, north}} = props.tile; return new deck.BitmapLayer(props, { data: null, image: props.data, bounds: [west, south, east, north] }); } });
+        }
+        
+        function renderVisualization(config) {
+            const baseMapLayer = createBaseMapLayer();
+            let dataLayer = null;
+            if (config.layerType === 'scatterplot_profile') {
+                const colorScale = d3.scaleSequential(d3.interpolateViridis).domain(d3.extent(config.data, d => d.value));
+                dataLayer = new deck.ScatterplotLayer({ id: 'profile-scatterplot', data: config.data, getPosition: d => d.position, getFillColor: d => { const c = d3.color(colorScale(d.value)); return [c.r, c.g, c.b, 200]; }, getRadius: 2000, pickable: true, radiusMinPixels: 2, radiusMaxPixels: 20 });
+            } else if (config.layerType === 'scatterplot_locations') {
+                dataLayer = new deck.ScatterplotLayer({ id: 'locations-scatterplot', data: config.data, getPosition: d => d.position, getFillColor: [245, 158, 11, 200], getRadius: 15000, pickable: true, radiusMinPixels: 5, radiusMaxPixels: 25 });
+            }
+            if (config.metadata) { deckgl.setProps({ initialViewState: { longitude: config.metadata.lon, latitude: config.metadata.lat, zoom: 5, pitch: 45, bearing: 0, transitionDuration: 'auto', transitionInterpolator: new deck.FlyToInterpolator() } }); }
+            deckgl.setProps({ layers: [baseMapLayer, dataLayer].filter(Boolean) });
+        }
+        
+        function toggleAreaSelection() { isSelectingArea = !isSelectingArea; dom.selectAreaBtn.classList.toggle('active', isSelectingArea); deckgl.setProps({ controller: { dragPan: !isSelectingArea, dragRotate: !isSelectingArea } }); }
+        function handleDragStart(info) { if (!isSelectingArea) return; selectionStart = info.coordinate; }
+        function handleDrag(info) { if (!selectionStart) return; const [startX, startY] = deckgl.project(selectionStart); const [currX, currY] = deckgl.project(info.coordinate); const left = Math.min(startX, currX); const top = Math.min(startY, currY); const width = Math.abs(startX - currX); const height = Math.abs(startY - currY); dom.selectionBox.style.left = `${left}px`; dom.selectionBox.style.top = `${top}px`; dom.selectionBox.style.width = `${width}px`; dom.selectionBox.style.height = `${height}px`; dom.selectionBox.classList.remove('hidden'); }
+        function handleDragEnd(info) { if (!selectionStart) return; dom.selectionBox.classList.add('hidden'); const minLon = Math.min(selectionStart[0], info.coordinate[0]); const maxLon = Math.max(selectionStart[0], info.coordinate[0]); const minLat = Math.min(selectionStart[1], info.coordinate[1]); const maxLat = Math.max(selectionStart[1], info.coordinate[1]); const boundingBox = `[[${minLon.toFixed(4)},${minLat.toFixed(4)}],[${maxLon.toFixed(4)},${maxLat.toFixed(4)}]]`; const query = `Find floats in the selected area with bounding box ${boundingBox}`; handleSpeechInput(query); toggleAreaSelection(); selectionStart = null; }
+
+        function setupSpeechRecognition() { if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return; const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; speechRecognition = new SpeechRecognition(); speechRecognition.continuous = false; speechRecognition.interimResults = true; speechRecognition.lang = 'en-US'; speechRecognition.onstart = () => { interimTranscript = ''; finalTranscript = ''; /* No UI update */ }; speechRecognition.onresult = (event) => { for (let i = event.resultIndex; i < event.results.length; i++) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript; else interimTranscript += event.results[i][0].transcript; } }; speechRecognition.onend = () => { const toSend = (finalTranscript || interimTranscript).trim(); if (toSend && !isWaitingForAIResponse) handleSpeechInput(toSend); }; speechRecognition.onerror = (event) => { console.error('Speech recognition error:', event.error); }; }
+        function startRecording() { if (isRecording || isWaitingForAIResponse) return; isRecording = true; if (avatar) avatar.resumeAudio(); dom.pushToTalkBtn.classList.add('recording'); if (speechRecognition) try { speechRecognition.start(); } catch (e) {} }
+        function stopRecording() { if (!isRecording) return; isRecording = false; dom.pushToTalkBtn.classList.remove('recording'); if (speechRecognition) try { speechRecognition.stop(); } catch (e) {} }
+        function handleSpeechInput(transcript) { addChatMessage('user', 'You', transcript); sendToAI({ role: 'user', content: transcript }); }
+        async function loadModelInBackground() { try { avatar = new TalkingHead(dom.avatarContainer, { ttsEndpoint: TTS_ENDPOINT, cameraView: 'upper' }); await avatar.init(); await avatar.showAvatar({ url: AVATAR_URL }); isModelLoaded = true; startSession(); } catch (error) { document.querySelector('.loading-text').textContent = 'Error loading 3D model.'; } }
+        async function startSession() { dom.loadingScreen.style.opacity = 0; setTimeout(() => { dom.loadingScreen.classList.add('hidden'); dom.appContainer.classList.add('loaded'); setTimeout(() => avatar && avatar.onResize(), 50); const welcomeMessage = "Hello! I'm Mike. I can find ARGO floats by name, like 'find floats near Japan', or you can use the grid button on the map to select an area visually. What would you like to explore? 😊"; addChatMessage('ai', 'Mike', welcomeMessage); messages.push({role: 'assistant', content: welcomeMessage}); if (avatar) avatar.speakText(welcomeMessage); }, 500); }
+        function addChatMessage(type, author, content) { const msg = document.createElement('div'); msg.className = `message ${type}`; msg.innerHTML = `<div class="message-author">${author}</div><div class="message-content">${content.replace(/<<<.+>>>/s, '')}</div>`; dom.chatMessages.appendChild(msg); dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight; }
+        function renderDebugLog(log) { if (!log) { dom.debugPane.innerHTML = 'No debug info.'; return; } let html = ''; log.forEach(entry => { const dataHtml = entry.data ? `<pre class="debug-data">${JSON.stringify(entry.data, null, 2)}</pre>` : ''; html += `<div class="debug-entry ${entry.type}"><div class="debug-title">${entry.type.replace('_', ' ').toUpperCase()}</div><div class="debug-content">${entry.content}</div>${dataHtml}</div>`; }); dom.debugPane.innerHTML = html; }
+        
+        // FIX 2: Added the missing scheduleAISubtitles function
+        function scheduleAISubtitles(sortedTP, totalDurationSec, audioStartAt) {
+            const subtitlesOverlay = dom.subtitlesOverlay;
+            if (!sortedTP || !sortedTP.length) return;
+            if (subtitlesOverlay._sched) {
+                subtitlesOverlay._sched.forEach(id => clearTimeout(id));
+            }
+            const ids = [];
+            const words = [];
+            const offsetMs = (audioStartAt - avatar.audioCtx.currentTime) * 1000;
+            const fullText = sortedTP.map(tp => tp.word).join(' ');
+
+            const showSubtitles = (text) => {
+                subtitlesOverlay.textContent = text;
+                subtitlesOverlay.classList.remove('hidden');
+            };
+
+            const hideSubtitles = () => {
+                subtitlesOverlay.classList.add('hidden');
+            };
+
+            const startDisplay = setTimeout(() => {
+                showSubtitles(fullText);
+            }, Math.max(0, offsetMs));
+
+            const endDisplay = setTimeout(() => {
+                hideSubtitles();
+            }, Math.max(0, offsetMs + (totalDurationSec * 1000) + 400));
+            
+            subtitlesOverlay._sched = [startDisplay, endDisplay];
+        }
+
+        const client_tools = {
+            get_geographical_bounds: async (args) => { const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(args.place_name)}&format=json&limit=1`; const response = await fetch(url, { headers: { 'User-Agent': 'FloatChat/1.0' } }); if (!response.ok) throw new Error(`Nominatim API error: ${response.statusText}`); const data = await response.json(); if (data.length === 0) throw new Error(`Could not find coordinates for "${args.place_name}".`); const bbox = data[0].boundingbox; return { box: `[[${bbox[2]},${bbox[0]}],[${bbox[3]},${bbox[1]}]]` }; },
+            shallow_analysis_find_floats: async (args) => {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+                const params = new URLSearchParams({ box: args.box, compression: 'minimal' });
+                const url = `https://argovis-api.colorado.edu/argo?${params.toString()}`;
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error(`Argovis API error: ${response.statusText}`);
+                
+                // Stream the response
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                const results = [];
+                const MAX_FLOATS = 15;
+
+                while (results.length < MAX_FLOATS) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    let start = buffer.indexOf('{');
+                    let end = buffer.indexOf('}');
+                    
+                    while(start !== -1 && end > start) {
+                        const objectStr = buffer.substring(start, end + 1);
+                        try {
+                            const parsed = JSON.parse(objectStr);
+                            if (parsed && typeof parsed.lon === 'number' && typeof parsed.lat === 'number') {
+                                results.push(parsed);
+                                if (results.length >= MAX_FLOATS) {
+                                    reader.cancel();
+                                    break;
+                                }
+                            }
+                        } catch (e) { /* Ignore parsing errors for incomplete objects */ }
+                        buffer = buffer.substring(end + 1);
+                        start = buffer.indexOf('{');
+                        end = buffer.indexOf('}');
+                    }
+                }
+                
+                if (results.length === 0) return { summary: `I searched the area but found no active ARGO floats.`, visualization: null };
+                const deckData = results.map(f => ({ position: [f.lon, f.lat], platform: f.platform_number }));
+                const boxCoords = JSON.parse(args.box);
+                const centerLon = (boxCoords[0][0] + boxCoords[1][0]) / 2;
+                const centerLat = (boxCoords[0][1] + boxCoords[1][1]) / 2;
+                return { summary: `Found at least ${deckData.length} floats.`, visualization: { layerType: 'scatterplot_locations', data: deckData, metadata: { lon: centerLon, lat: centerLat, title: `${deckData.length}+ Floats Found` } } };
+            },
+            deep_dive_analysis: async (args) => { const params = new URLSearchParams({ platform_number: args.platform_id, data: '["TEMP_ADJUSTED","PSAL_ADJUSTED","PRES_ADJUSTED"]' }); const url = `https://argovis-api.colorado.edu/argo?${params.toString()}`; const response = await fetch(url); if (!response.ok) throw new Error(`Argovis API returned status ${response.status}`); const data = await response.json(); if (data.length === 0) throw new Error(`No data found for float ID ${args.platform_id}.`); const firstProfile = data[0]; const variable = args.data_type === 'temperature' ? 'TEMP_ADJUSTED' : 'PSAL_ADJUSTED'; const deckData = firstProfile.measurements.map(m => ({ position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], -m.PRES_ADJUSTED], value: m[variable], pressure: m.PRES_ADJUSTED })); return { summary: `Found ${deckData.length} data points.`, visualization: { layerType: 'scatterplot_profile', data: deckData, metadata: { lon: firstProfile.geolocation.coordinates[0], lat: firstProfile.geolocation.coordinates[1], title: `${args.data_type} Profile` } } }; }
+        };
+
+        async function sendToAI(message) {
+            if (isWaitingForAIResponse && !message.tool_response) return;
+            isWaitingForAIResponse = true;
+            messages.push(message);
+            renderDebugLog([{type: 'info', content: 'Sending message to agent...'}]);
+            
+            try {
+                const workerResponse = await fetch(BACKEND_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages }) });
+                if (!workerResponse.ok) throw new Error(`Worker API Error: ${workerResponse.status}`);
+                const data = await workerResponse.json();
+
+                if (data.response) {
+                    addChatMessage('ai', 'Mike', data.response);
+                    messages.push({ role: 'assistant', content: data.response });
+                    const { clean, emojis } = extractEmojisAndSanitize(data.response);
+                    if (avatar) { emojis.slice(0, 3).forEach((e, i) => { const known = avatar.animEmojis[e] ? e : '😊'; setTimeout(() => avatar.speakEmoji(known), i * 400); }); avatar.speakText(clean); }
+                }
+
+                if (data.functionCall) {
+                    renderDebugLog([{type: 'tool_call', content: `Agent wants to call: ${data.functionCall.name}`, data: data.functionCall.args}]);
+                    const tool_function = client_tools[data.functionCall.name];
+                    const tool_response = await tool_function(data.functionCall.args);
+                    sendToAI({ role: 'user', content: '', tool_response: tool_response, tool_name: data.functionCall.name });
+                    return; 
+                }
+                
+                const finalMessage = messages[messages.length - 1].content;
+                const commandRegex = /<<<(\w+):({.+})>>>/s;
+                const match = finalMessage.match(commandRegex);
+                if (match) {
+                    try { const config = JSON.parse(match[2]); if (match[1] === 'VISUALIZE_MAP') renderVisualization(config.visualization); } catch (e) { console.error("Failed to parse command:", e, match[2]); }
+                }
+                
+            } catch (error) {
+                console.error('AI communication error:', error);
+                addChatMessage('ai', 'System', 'I encountered an error. Please check the debug log and console for details.');
+                renderDebugLog([{type: 'error', content: error.stack}]);
+            }
+            isWaitingForAIResponse = false;
+        }
+        function endSession() { if (confirm('End session?')) { location.reload(); } }
+        
+        init();
+    </script>
+</body>
+</html>
