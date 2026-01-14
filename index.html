@@ -805,9 +805,10 @@ CRITICAL INSTRUCTIONS:
                 const latestProfileID = metaData[0][0];
 
                 // Step 3: Fetch full data for THIS profile
+                // FIX: Use simple comma-separated string for data fields, and use standard names (temperature, salinity, pressure)
                 const dataParams = new URLSearchParams({
                     id: latestProfileID,
-                    data: '["TEMP_ADJUSTED","PSAL_ADJUSTED","PRES_ADJUSTED"]'
+                    data: 'temperature,salinity,pressure'
                 });
                 const dataUrl = `https://argovis-api.colorado.edu/argo?${dataParams.toString()}`;
 
@@ -818,12 +819,14 @@ CRITICAL INSTRUCTIONS:
                 if (data.length === 0) throw new Error(`No data found for profile ${latestProfileID}.`);
 
                 const firstProfile = data[0];
-                const variable = args.data_type === 'temperature' ? 'TEMP_ADJUSTED' : 'PSAL_ADJUSTED';
+                // Map visualization variable based on user request ('temperature' or 'salinity')
+                // Note: API returns keys 'temperature', 'salinity', 'pressure' now
+                const variable = args.data_type === 'temperature' ? 'temperature' : 'salinity';
 
                 const deckData = firstProfile.measurements.map(m => ({
-                    position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], -m.PRES_ADJUSTED],
+                    position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], -m.pressure],
                     value: m[variable],
-                    pressure: m.PRES_ADJUSTED
+                    pressure: m.pressure
                 }));
 
                 return {

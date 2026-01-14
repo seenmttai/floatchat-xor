@@ -1,7 +1,7 @@
 const https = require('https');
 
 const platform = '2900883';
-const dataFields = JSON.stringify(["TEMP_ADJUSTED", "PSAL_ADJUSTED", "PRES_ADJUSTED"]);
+const dataFields = JSON.stringify(["temperature", "salinity", "pressure"]);
 
 function fetchJson(url) {
     return new Promise((resolve, reject) => {
@@ -40,6 +40,11 @@ async function run() {
         const fullData = await fetchJson(dataUrl);
         console.log(`Success! Fetched data for ${fullData[0]._id}`);
         console.log(`Data points: ${fullData[0].measurements.length}`);
+
+        // Inspect valid keys
+        if (fullData[0].measurements.length > 0) {
+            console.log('Measurement Keys:', Object.keys(fullData[0].measurements[0]));
+        }
 
     } catch (err) {
         console.error('Error:', err);
