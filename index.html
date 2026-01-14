@@ -697,8 +697,25 @@ CRITICAL INSTRUCTIONS:
             const baseMapLayer = createBaseMapLayer();
             let dataLayer = null;
             if (config.layerType === 'scatterplot_profile') {
-                const colorScale = d3.scaleSequential(d3.interpolateViridis).domain(d3.extent(config.data, d => d.value));
-                dataLayer = new deck.ScatterplotLayer({ id: 'profile-scatterplot', data: config.data, getPosition: d => d.position, getFillColor: d => { const c = d3.color(colorScale(d.value)); return [c.r, c.g, c.b, 200]; }, getRadius: 2000, pickable: true, radiusMinPixels: 2, radiusMaxPixels: 20 });
+                // Log domain for debugging
+                const domain = d3.extent(config.data, d => d.value);
+                console.log("Data domain:", domain);
+                const colorScale = d3.scaleSequential(d3.interpolateViridis).domain(domain);
+
+                dataLayer = new deck.ScatterplotLayer({
+                    id: 'profile-scatterplot',
+                    data: config.data,
+                    // Force 2D position to ensure visibility (ignore depth for now)
+                    getPosition: d => [d.position[0], d.position[1]],
+                    getFillColor: d => {
+                        const c = d3.color(colorScale(d.value));
+                        return [c.r, c.g, c.b, 255]; // Full opacity
+                    },
+                    getRadius: 2000,
+                    pickable: true,
+                    radiusMinPixels: 6, // Make them visible!
+                    radiusMaxPixels: 30
+                });
             } else if (config.layerType === 'scatterplot_locations') {
                 dataLayer = new deck.ScatterplotLayer({ id: 'locations-scatterplot', data: config.data, getPosition: d => d.position, getFillColor: [245, 158, 11, 200], getRadius: 15000, pickable: true, radiusMinPixels: 5, radiusMaxPixels: 25 });
             }
