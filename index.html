@@ -775,8 +775,10 @@ CRITICAL INSTRUCTIONS:
                 const centerLon = (boxCoords[0][0] + boxCoords[1][0]) / 2;
                 const centerLat = (boxCoords[0][1] + boxCoords[1][1]) / 2;
 
+                const topIDs = deckData.slice(0, 5).map(d => d.platform).join(', ');
+
                 return {
-                    summary: `Found ${results.length} floats.`,
+                    summary: `Found ${results.length} floats. Some IDs include: ${topIDs}`,
                     visualization: {
                         layerType: 'scatterplot_locations',
                         data: deckData,
