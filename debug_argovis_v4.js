@@ -45,6 +45,9 @@ async function testDataParam(name, dataParamValue) {
             if (result[0].measurements) {
                 console.log(`[${name}] Measurements count: ${result[0].measurements.length}`);
                 if (result[0].measurements.length > 0) console.log(`[${name}] Meas Keys: ${Object.keys(result[0].measurements[0])}`);
+            } else if (result[0].data) {
+                console.log(`[${name}] Data array found! Length: ${result[0].data.length}`);
+                console.log(`[${name}] First row: ${JSON.stringify(result[0].data[0])}`);
             }
         } else {
             console.log(`[${name}] Success (Empty array?)`);

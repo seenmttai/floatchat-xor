@@ -619,7 +619,7 @@
         let EMOJI_CHAR, NON_TTS;
         try { EMOJI_CHAR = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u; NON_TTS = /[^\p{L}\p{N}\p{P}\p{Z}\n\r\t]/gu; } catch { EMOJI_CHAR = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u; NON_TTS = /[^A-Za-z0-9\s.,!?;:'"()[\]{}<>@#$%^&*_\-+=/\\|~`]/g; }
         function extractEmojisAndSanitize(text = "") { const chars = Array.from(text); const emojis = []; const noEmoji = chars.map(ch => { if (EMOJI_CHAR.test(ch)) { emojis.push(ch); return ""; } return ch; }).join(""); let clean = noEmoji.replace(NON_TTS, "").replace(/\s{2,}/g, " ").trim(); return { clean, emojis }; }
-        function sanitizeForTTS(s) { return extractEmojisAndSanitize(s).clean; }
+        function sanitizeForTTS(s) { return extractEmojisAndSanitize(s).clean.replace(/\*/g, ''); }
 
         const SYSTEM_PROMPT = `
 You are Mike, an expert oceanographer AI agent powered by advanced tools.
@@ -820,13 +820,14 @@ CRITICAL INSTRUCTIONS:
 
                 const firstProfile = data[0];
                 // Map visualization variable based on user request ('temperature' or 'salinity')
-                // Note: API returns keys 'temperature', 'salinity', 'pressure' now
-                const variable = args.data_type === 'temperature' ? 'temperature' : 'salinity';
+                // API data matrix order: [temperature, salinity, pressure]
+                const variableIdx = args.data_type === 'temperature' ? 0 : 1;
+                const pressureIdx = 2; // Pressure is always last requested
 
-                const deckData = firstProfile.measurements.map(m => ({
-                    position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], -m.pressure],
-                    value: m[variable],
-                    pressure: m.pressure
+                const deckData = firstProfile.data.map(m => ({
+                    position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], -m[pressureIdx]],
+                    value: m[variableIdx],
+                    pressure: m[pressureIdx]
                 }));
 
                 return {
