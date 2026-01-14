@@ -834,7 +834,7 @@ CRITICAL INSTRUCTIONS:
                     const full_tool_result = await tool_function(data.functionCall.args);
 
                     // Handle Visualization Locally
-                    let contentToSendToLLM = full_tool_result.summary;
+                    let contentToSendToLLM = full_tool_result.summary || JSON.stringify(full_tool_result);
                     if (full_tool_result.visualization) {
                         renderVisualization(full_tool_result.visualization);
                         contentToSendToLLM += " (Visualization rendered on map)";
@@ -845,7 +845,8 @@ CRITICAL INSTRUCTIONS:
                     await sendToAI({
                         role: 'function',
                         tool_name: data.functionCall.name,
-                        tool_response: contentToSendToLLM
+                        tool_response: contentToSendToLLM,
+                        content: contentToSendToLLM
                     });
                 }
 
