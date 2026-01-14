@@ -697,30 +697,64 @@ CRITICAL INSTRUCTIONS:
             const baseMapLayer = createBaseMapLayer();
             let dataLayer = null;
             if (config.layerType === 'scatterplot_profile') {
-                // Log domain for debugging
                 const domain = d3.extent(config.data, d => d.value);
-                console.log("Data domain:", domain);
                 const colorScale = d3.scaleSequential(d3.interpolateViridis).domain(domain);
+                const Z_SCALE = config.metadata.zScale || 1; // Vertical exaggeration
 
+                // 1. Line Layer (The Profile Trace)
+                // We need to construct a path. Scatterplot config.data is array of points.
+                // We must sort by depth to draw a clean line.
+                const sortedData = [...config.data].sort((a, b) => a.pressure - b.pressure);
+                const pathData = [{
+                    path: sortedData.map(d => [d.position[0], d.position[1], d.pressure * Z_SCALE]),
+                    name: 'Profile Trace',
+                    color: [255, 255, 255]
+                }];
+                const lineLayer = new deck.PathLayer({
+                    id: 'profile-line',
+                    data: pathData,
+                    getPath: d => d.path,
+                    getColor: [200, 200, 200, 150],
+                    getWidth: 3,
+                    widthMinPixels: 2,
+                    pickable: false
+                });
+
+                // 2. Scatterplot Layer (The Data Points)
                 dataLayer = new deck.ScatterplotLayer({
                     id: 'profile-scatterplot',
                     data: config.data,
-                    // Force 2D position to ensure visibility (ignore depth for now)
-                    getPosition: d => [d.position[0], d.position[1]],
+                    // Project UPWARDS (positive Z) for visibility "Sky Scraper" style
+                    getPosition: d => [d.position[0], d.position[1], d.pressure * Z_SCALE],
                     getFillColor: d => {
                         const c = d3.color(colorScale(d.value));
-                        return [c.r, c.g, c.b, 255]; // Full opacity
+                        return [c.r, c.g, c.b, 255];
                     },
-                    getRadius: 2000,
-                    pickable: true,
-                    radiusMinPixels: 6, // Make them visible!
-                    radiusMaxPixels: 30
+                    getRadius: 5, // constant physical size
+                    radiusMinPixels: 5,
+                    radiusMaxPixels: 20,
+                    pickable: true
                 });
+                // Combine layers
+                deckgl.setProps({ layers: [baseMapLayer, lineLayer, dataLayer].filter(Boolean) });
+
             } else if (config.layerType === 'scatterplot_locations') {
                 dataLayer = new deck.ScatterplotLayer({ id: 'locations-scatterplot', data: config.data, getPosition: d => d.position, getFillColor: [245, 158, 11, 200], getRadius: 15000, pickable: true, radiusMinPixels: 5, radiusMaxPixels: 25 });
+                deckgl.setProps({ layers: [baseMapLayer, dataLayer].filter(Boolean) });
             }
-            if (config.metadata) { deckgl.setProps({ initialViewState: { longitude: config.metadata.lon, latitude: config.metadata.lat, zoom: 5, pitch: 45, bearing: 0, transitionDuration: 'auto', transitionInterpolator: new deck.FlyToInterpolator() } }); }
-            deckgl.setProps({ layers: [baseMapLayer, dataLayer].filter(Boolean) });
+            if (config.metadata) {
+                deckgl.setProps({
+                    initialViewState: {
+                        longitude: config.metadata.lon,
+                        latitude: config.metadata.lat,
+                        zoom: 8, // Zoom in closer for deep dive
+                        pitch: 60, // Higher pitch to see the "Tower"
+                        bearing: 30, // Slight angle
+                        transitionDuration: 2000,
+                        transitionInterpolator: new deck.FlyToInterpolator()
+                    }
+                });
+            }
         }
 
         function toggleAreaSelection() { isSelectingArea = !isSelectingArea; dom.selectAreaBtn.classList.toggle('active', isSelectingArea); deckgl.setProps({ controller: { dragPan: !isSelectingArea, dragRotate: !isSelectingArea } }); }
@@ -842,7 +876,8 @@ CRITICAL INSTRUCTIONS:
                 const pressureIdx = 2; // Pressure is always last requested
 
                 const deckData = firstProfile.data.map(m => ({
-                    position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], -m[pressureIdx]],
+                    // Use POSITIVE pressure for "Sky Tower" visualization logic in renderer
+                    position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], m[pressureIdx]],
                     value: m[variableIdx],
                     pressure: m[pressureIdx]
                 }));
@@ -917,8 +952,10 @@ CRITICAL INSTRUCTIONS:
                     // Handle Visualization Locally
                     let contentToSendToLLM = full_tool_result.summary || JSON.stringify(full_tool_result);
                     if (full_tool_result.visualization) {
+                        // Enhance config for better rendering
+                        full_tool_result.visualization.metadata.zScale = 50; // Exaggerate height
                         renderVisualization(full_tool_result.visualization);
-                        contentToSendToLLM += " (Visualization rendered on map)";
+                        contentToSendToLLM += " (Visualization rendered on map. Note: Depth is projected upwards for visibility.)";
                     }
 
                     // RECURSE: Send result back to AI
