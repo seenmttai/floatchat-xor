@@ -787,7 +787,58 @@ CRITICAL INSTRUCTIONS:
                 };
             },
 
-            deep_dive_analysis: async (args) => { const params = new URLSearchParams({ platform_number: args.platform_id, data: '["TEMP_ADJUSTED","PSAL_ADJUSTED","PRES_ADJUSTED"]', limit: '1' }); const url = `https://argovis-api.colorado.edu/argo?${params.toString()}`; const response = await fetch(url); if (!response.ok) throw new Error(`Argovis API returned status ${response.status}`); const data = await response.json(); if (data.length === 0) throw new Error(`No data found for float ID ${args.platform_id}.`); const firstProfile = data[0]; const variable = args.data_type === 'temperature' ? 'TEMP_ADJUSTED' : 'PSAL_ADJUSTED'; const deckData = firstProfile.measurements.map(m => ({ position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], -m.PRES_ADJUSTED], value: m[variable], pressure: m.PRES_ADJUSTED })); return { summary: `Found ${deckData.length} data points for float ${args.platform_id}.`, visualization: { layerType: 'scatterplot_profile', data: deckData, metadata: { lon: firstProfile.geolocation.coordinates[0], lat: firstProfile.geolocation.coordinates[1], title: `${args.data_type} Profile` } } }; }
+            deep_dive_analysis: async (args) => {
+                // Step 1: Get list of profiles (lightweight)
+                const metaParams = new URLSearchParams({ platform: args.platform_id, compression: 'minimal' });
+                const metaUrl = `https://argovis-api.colorado.edu/argo?${metaParams.toString()}`;
+
+                const metaResp = await fetch(metaUrl);
+                if (!metaResp.ok) throw new Error(`Argovis metadata error: ${metaResp.status}`);
+                const metaData = await metaResp.json();
+
+                if (metaData.length === 0) throw new Error(`No profiles found for float ${args.platform_id}.`);
+
+                // Step 2: Find latest profile
+                // Format: [id, lon, lat, date, source, key]
+                // Sort descending by date (index 3)
+                metaData.sort((a, b) => new Date(b[3]) - new Date(a[3]));
+                const latestProfileID = metaData[0][0];
+
+                // Step 3: Fetch full data for THIS profile
+                const dataParams = new URLSearchParams({
+                    id: latestProfileID,
+                    data: '["TEMP_ADJUSTED","PSAL_ADJUSTED","PRES_ADJUSTED"]'
+                });
+                const dataUrl = `https://argovis-api.colorado.edu/argo?${dataParams.toString()}`;
+
+                const response = await fetch(dataUrl);
+                if (!response.ok) throw new Error(`Argovis data error: ${response.status}`);
+                const data = await response.json();
+
+                if (data.length === 0) throw new Error(`No data found for profile ${latestProfileID}.`);
+
+                const firstProfile = data[0];
+                const variable = args.data_type === 'temperature' ? 'TEMP_ADJUSTED' : 'PSAL_ADJUSTED';
+
+                const deckData = firstProfile.measurements.map(m => ({
+                    position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], -m.PRES_ADJUSTED],
+                    value: m[variable],
+                    pressure: m.PRES_ADJUSTED
+                }));
+
+                return {
+                    summary: `Found ${deckData.length} data points for float ${args.platform_id} (Profile ${latestProfileID}).`,
+                    visualization: {
+                        layerType: 'scatterplot_profile',
+                        data: deckData,
+                        metadata: {
+                            lon: firstProfile.geolocation.coordinates[0],
+                            lat: firstProfile.geolocation.coordinates[1],
+                            title: `${args.data_type} Profile`
+                        }
+                    }
+                };
+            }
         };
 
         function setAgentStatus(text) {
