@@ -41,65 +41,67 @@
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E🌊%3C/text%3E%3C/svg%3E">
     <style>
         :root {
-            --primary: #1e40af;
-            --primary-light: #3b82f6;
+            --primary: #0ea5e9;
+            --primary-light: #38bdf8;
             --secondary: #64748b;
             --success: #10b981;
             --warning: #f59e0b;
             --error: #ef4444;
-            --bg-primary: #0f172a;
-            --bg-secondary: #111827;
-            --bg-tertiary: #1f2a37;
-            --text-primary: #f9fafb;
-            --text-secondary: #e5e7eb;
-            --text-muted: #94a3b8;
-            --border: #374151;
-            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            --border-radius: 12px;
-            --transition: all 0.2s ease;
-        }
-
-        .hidden {
-            display: none !important;
+            --bg-primary: #020617;
+            --bg-secondary: #0f172a;
+            --bg-tertiary: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #1e293b;
+            --glass-bg: rgba(15, 23, 42, 0.7);
+            --glass-border: rgba(148, 163, 184, 0.1);
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
+            scrollbar-width: thin;
+            scrollbar-color: var(--bg-tertiary) transparent;
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            background-color: var(--bg-primary);
             color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
+            height: 100vh;
+            overflow: hidden;
+            line-height: 1.5;
         }
 
-        #loading-screen {
+        .loading-screen {
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
+            width: 100%;
+            height: 100%;
             background: var(--bg-primary);
             display: flex;
             flex-direction: column;
-            align-items: center;
             justify-content: center;
-            z-index: 1000;
+            align-items: center;
+            z-index: 100;
             transition: opacity 0.5s ease;
         }
 
+        .loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         .loading-spinner {
-            width: 48px;
-            height: 48px;
-            border: 3px solid rgba(59, 130, 246, 0.2);
-            border-top: 3px solid var(--primary-light);
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--bg-tertiary);
+            border-top: 3px solid var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 1.5rem;
         }
 
         @keyframes spin {
@@ -112,11 +114,6 @@
             }
         }
 
-        .loading-text {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-        }
-
         .app-container {
             position: fixed;
             top: 0;
@@ -125,10 +122,9 @@
             bottom: 0;
             display: grid;
             grid-template-rows: auto 1fr auto;
-            grid-template-columns: 1fr 420px;
+            grid-template-columns: 1fr 400px;
             opacity: 0;
             transition: opacity 0.5s ease;
-            pointer-events: none;
         }
 
         .app-container.loaded {
@@ -138,12 +134,29 @@
 
         .app-header {
             grid-column: 1 / -1;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            padding: 1rem 2rem;
-            border-bottom: 1px solid var(--border);
+            background: rgba(2, 6, 23, 0.8);
+            backdrop-filter: blur(12px);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--glass-border);
             z-index: 10;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.1rem;
+            letter-spacing: -0.025em;
+        }
+
+        .header-logo svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--primary);
         }
 
         .main-content {
@@ -151,6 +164,7 @@
             grid-row: 2 / 3;
             position: relative;
             background: var(--bg-secondary);
+            overflow: hidden;
         }
 
         #map {
@@ -159,103 +173,117 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: #111827;
+            background: #020617;
         }
 
         #selection-box {
             position: absolute;
-            background: rgba(59, 130, 246, 0.2);
-            border: 1px dashed var(--primary-light);
+            background: rgba(14, 165, 233, 0.15);
+            border: 2px dashed var(--primary);
             pointer-events: none;
+            backdrop-filter: blur(2px);
+            border-radius: 4px;
         }
 
         .map-controls {
             position: absolute;
-            top: 1rem;
-            right: 1rem;
+            top: 1.5rem;
+            right: 1.5rem;
             z-index: 10;
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.75rem;
         }
 
         .map-btn {
-            background: var(--bg-tertiary);
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
             color: var(--text-primary);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.5rem;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
             transition: var(--transition);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         .map-btn:hover,
         .map-btn.active {
-            background: var(--primary-light);
+            background: var(--primary);
             border-color: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(14, 165, 233, 0.4);
         }
 
         .avatar-container {
             position: absolute;
-            bottom: 1rem;
-            left: 1rem;
-            width: 300px;
-            height: 300px;
-            border: 2px solid var(--border);
-            border-radius: var(--border-radius);
-            overflow: hidden;
-            background: rgba(15, 23, 42, 0.5);
-            backdrop-filter: blur(5px);
-        }
-
-        .subtitles-overlay {
-            position: absolute;
-            left: 50%;
-            bottom: 1rem;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, .65);
-            color: #fff;
-            padding: .6rem .9rem;
-            border-radius: 10px;
-            max-width: 88%;
-            text-align: center;
+            bottom: 2rem;
+            left: 2rem;
+            width: 320px;
+            height: 320px;
             z-index: 20;
             pointer-events: none;
+            filter: drop-shadow(0 20px 25px rgba(0, 0, 0, 0.5));
+            transition: transform 0.3s ease;
         }
 
         .sidebar {
             grid-column: 2 / 3;
-            grid-row: 2 / 3;
-            background: var(--bg-secondary);
-            border-left: 1px solid var(--border);
+            grid-row: 2 / 4;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid var(--glass-border);
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
-        .sidebar-tabs {
+        .tabs {
             display: flex;
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
+            border-bottom: 1px solid var(--glass-border);
+            padding: 0 0.5rem;
+            background: rgba(2, 6, 23, 0.4);
         }
 
         .tab-btn {
             flex: 1;
-            padding: 0.75rem;
-            background: transparent;
+            padding: 1rem;
+            background: none;
             border: none;
-            color: var(--text-muted);
-            cursor: pointer;
+            color: var(--text-secondary);
+            font-family: inherit;
             font-weight: 500;
+            font-size: 0.9rem;
+            cursor: pointer;
+            position: relative;
+            transition: var(--transition);
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
         }
 
         .tab-btn.active {
-            color: var(--text-primary);
-            background: var(--bg-tertiary);
-            border-bottom: 2px solid var(--primary-light);
+            color: var(--primary);
         }
 
-        .sidebar-content {
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary);
+            box-shadow: 0 -2px 10px var(--primary);
+        }
+
+        .tab-content {
             flex: 1;
             overflow: hidden;
             position: relative;
@@ -265,197 +293,219 @@
             position: absolute;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
-            padding: 1rem;
-            overflow-y: auto;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.2s ease;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
         }
 
         .tab-pane.active {
-            opacity: 1;
-            visibility: visible;
+            display: flex;
         }
 
-        .pane-title {
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 0.75rem;
-        }
-
-        .debug-content,
         .chat-messages {
-            font-family: monospace;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .debug-entry {
-            border-left: 3px solid var(--secondary);
-            padding-left: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .debug-entry.decision {
-            border-color: var(--primary-light);
-        }
-
-        .debug-entry.tool_call {
-            border-color: var(--warning);
-        }
-
-        .debug-entry.success {
-            border-color: var(--success);
-        }
-
-        .debug-entry.error {
-            border-color: var(--error);
-        }
-
-        .debug-title {
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .debug-data {
-            background: rgba(0, 0, 0, 0.2);
-            padding: 0.5rem;
-            border-radius: 4px;
-            margin-top: 0.5rem;
-            max-height: 150px;
+            flex: 1;
             overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
         }
 
         .message {
-            margin-bottom: 1rem;
-            padding: 0.75rem;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.05);
+            max-width: 85%;
+            padding: 1rem 1.25rem;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            position: relative;
+            animation: fadeIn 0.3s ease-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .message.ai {
-            border-left: 3px solid var(--primary-light);
+            align-self: flex-start;
+            background: var(--bg-tertiary);
+            border-top-left-radius: 4px;
+            color: var(--text-primary);
+            border: 1px solid var(--glass-border);
+        }
+
+        .message.ai .message-author {
+            color: var(--primary-light);
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .message.user {
-            border-left: 3px solid var(--success);
-        }
-
-        .message-author {
-            font-weight: 600;
-            font-size: 0.85rem;
-            margin-bottom: 0.25rem;
-            color: var(--text-secondary);
-        }
-
-        .message-content {
-            color: var(--text-primary);
-            line-height: 1.4;
-        }
-
-        .app-footer {
-            grid-column: 1 / -1;
-            background: rgba(0, 0, 0, 0.9);
-            backdrop-filter: blur(10px);
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            border-top: 1px solid var(--border);
-            z-index: 10;
-        }
-
-        .footer-btn {
-            width: 48px;
-            height: 48px;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-        }
-
-        .footer-btn.end-call {
-            background: var(--error);
+            align-self: flex-end;
+            background: linear-gradient(135deg, var(--primary) 0%, #0284c7 100%);
+            border-bottom-right-radius: 4px;
             color: white;
         }
 
-        .floating-ptt {
+        .message.user .message-author {
+            display: none;
+        }
+
+        .input-area {
+            padding: 1.5rem;
+            border-top: 1px solid var(--glass-border);
+            background: rgba(2, 6, 23, 0.4);
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        /* Simplified Status Pill */
+        .agent-status {
             position: fixed;
-            right: 436px;
-            bottom: 88px;
-            z-index: 1100;
+            top: 5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(2, 6, 23, 0.9);
+            border: 1px solid var(--primary-light);
+            color: var(--primary-light);
+            padding: 0.5rem 1.25rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px);
+        }
+
+        .agent-status.hidden {
+            opacity: 0;
+            transform: translate(-50%, -20px);
             pointer-events: none;
         }
 
-        .floating-ptt .container {
-            pointer-events: auto;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 8px 10px;
-            border-radius: 14px;
-            backdrop-filter: blur(8px);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .push-to-talk-btn {
-            width: 56px;
-            height: 56px;
-            border: 3px solid var(--primary-light);
+        .agent-status-icon {
+            width: 8px;
+            height: 8px;
+            background: var(--primary-light);
             border-radius: 50%;
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-        }
-
-        .push-to-talk-btn:hover {
-            background: rgba(59, 130, 246, 0.1);
-        }
-
-        .push-to-talk-btn.recording {
-            background: var(--error);
-            border-color: var(--error);
+            box-shadow: 0 0 10px var(--primary-light);
             animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
             0% {
-                transform: scale(1);
+                opacity: 1;
             }
 
             50% {
-                transform: scale(1.05);
+                opacity: 0.4;
             }
 
             100% {
-                transform: scale(1);
+                opacity: 1;
             }
         }
 
-        .speech-status {
+        .floating-ptt {
             position: absolute;
-            bottom: 100%;
+            bottom: 2rem;
+            right: 2rem;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 50;
+        }
+
+        .floating-ptt:hover {
+            transform: scale(1.05);
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 20px 30px -10px rgba(14, 165, 233, 0.5);
+        }
+
+        .floating-ptt.active,
+        .floating-ptt.recording {
+            background: var(--error);
+            border-color: var(--error);
+            animation: breathe 2s infinite;
+        }
+
+        @keyframes breathe {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 20px rgba(239, 68, 68, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .subtitles-overlay {
+            position: absolute;
+            bottom: 6rem;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            margin-bottom: 0.5rem;
-            opacity: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            color: white;
+            max-width: 80%;
+            text-align: center;
             pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 40;
+            line-height: 1.4;
+        }
+
+        .subtitles-overlay.hidden {
+            opacity: 0;
+        }
+
+        .debug-pane {
+            padding: 1.5rem;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            overflow-y: auto;
+            height: 100%;
+        }
+
+        .debug-entry {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
         }
 
         @media (max-width: 992px) {
@@ -468,7 +518,7 @@
                 grid-column: 1 / -1;
                 grid-row: 3 / 4;
                 border-left: none;
-                border-top: 1px solid var(--border);
+                border-top: 1px solid var(--glass-border);
                 max-height: 40vh;
             }
 
@@ -478,8 +528,8 @@
             }
 
             .floating-ptt {
-                right: 16px;
-                bottom: 88px;
+                right: 1.5rem;
+                bottom: 5rem;
             }
         }
     </style>
@@ -498,60 +548,79 @@
 <body>
     <div id="loading-screen" class="loading-screen">
         <div class="loading-spinner"></div>
-        <div class="loading-text">Calibrating sensors and loading AI...</div>
     </div>
+
+    <div id="agent-status" class="agent-status hidden">
+        <div class="agent-status-icon"></div>
+        <span id="agent-status-text">Processing...</span>
+    </div>
+
     <div id="app-container" class="app-container">
-        <header class="app-header">FloatChat - AI Ocean Data Agent</header>
-        <div id="agent-status" class="agent-status hidden">
-            <svg class="agent-status-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2">
-                <path
-                    d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
-            </svg>
-            <span id="agent-status-text">Mike is thinking...</span>
-        </div>
+        <header class="app-header">
+            <div class="header-logo">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-2h2v2zm0-4H9V7h2v5z" />
+                </svg>
+                FloatChat
+            </div>
+            <button id="end-session-btn" class="map-btn"
+                style="width: auto; padding: 0 1rem; font-size: 0.8rem; height: 36px;">End Session</button>
+        </header>
+
         <main class="main-content">
             <div id="map"></div>
             <div id="selection-box" class="hidden"></div>
+
             <div class="map-controls">
                 <button id="select-area-btn" class="map-btn" title="Select Area">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path
-                            d="M21 3H3C2.44772 3 2 3.44772 2 4V20C2 20.5523 2.44772 21 3 21H21C21.5523 21 22 20.5523 22 20V4C22 3.44772 21.5523 3 21 3Z" />
-                        <path d="M7 3V21" />
-                        <path d="M17 3V21" />
-                        <path d="M2 12H22" />
-                        <path d="M2 7H7" />
-                        <path d="M2 17H7" />
-                        <path d="M17 17H22" />
-                        <path d="M17 7H22" />
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <path d="M8 8h8v8H8z" />
                     </svg>
                 </button>
             </div>
+
             <div id="avatar-container" class="avatar-container"></div>
             <div id="subtitles-overlay" class="subtitles-overlay hidden"></div>
+
+            <button id="push-to-talk-btn" class="floating-ptt">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+            </button>
         </main>
+
         <aside class="sidebar">
-            <div class="sidebar-tabs">
-                <button class="tab-btn active" data-tab="chat">Chat History</button>
-                <button class="tab-btn" data-tab="debug">Agent Activity</button>
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="chat">Chat</button>
+                <button class="tab-btn" data-tab="debug">Activity</button>
             </div>
-            <div class="sidebar-content">
+            <div class="tab-content">
                 <div id="chat-pane" class="tab-pane active">
-                    <div id="chat-messages" class="chat-messages"></div>
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="message ai">
+                            <div class="message-author">System</div>
+                            <div class="message-content">Initializing Ocean Agent...</div>
+                        </div>
+                    </div>
                 </div>
                 <div id="debug-pane" class="tab-pane">
-                    <h3 class="pane-title">Debug Log</h3>
-                    <div id="debug-content" class="debug-content">Agent is idle.</div>
+                    <div id="debug-content" class="debug-pane">
+                        <div class="debug-entry">
+                            <div class="debug-title">SYSTEM</div>
+                            <div class="debug-content">Ready.</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </aside>
-        <footer class="app-footer"><button id="end-session-btn" class="footer-btn end-call" title="End Session"><svg
-                    width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path
-                        d="M12 9c-1.66 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11-.53-.29-.71l-2.48 2.48c-.18.18-.43.29-.71.29-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z" />
-                </svg></button></footer>
+        <path
+            d="M12 9c-1.66 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11-.53-.29-.71l-2.48 2.48c-.18.18-.43.29-.71.29-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z" />
+        </svg></button></footer>
         <div class="floating-ptt">
             <div class="container"><button id="push-to-talk-btn" class="push-to-talk-btn" title="Hold to speak"><svg
                         width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
@@ -569,7 +638,7 @@
         import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
         import { LipsyncEn } from 'lipsync-en';
 
-        // --- START OF UNABRIDGED TALKINGHEAD CLASS ---
+
         class TalkingHead {
             constructor(node, opt = {}) { this.nodeAvatar = node; this.opt = { ttsEndpoint: null, lipsyncLang: 'en', cameraView: 'upper', ...opt }; this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); const w = Math.max(this.nodeAvatar.clientWidth || 640, 640); const h = Math.max(this.nodeAvatar.clientHeight || 360, 360); this.renderer.setPixelRatio(window.devicePixelRatio); this.renderer.setSize(w, h); this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.sortObjects = false; this.nodeAvatar.appendChild(this.renderer.domElement); this.camera = new THREE.PerspectiveCamera(25, w / h, 0.1, 100); this.scene = new THREE.Scene(); this.scene.add(new THREE.AmbientLight(0xffffff, 0.8)); const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); directionalLight.position.set(0.5, 1, 1).normalize(); this.scene.add(directionalLight); this.controls = new OrbitControls(this.camera, this.renderer.domElement); this.controls.enableZoom = false; this.controls.enablePan = false; this.controls.target.set(0, 1.6, 0); this.controls.enableDamping = true; this.controls.dampingFactor = 0.05; this.animClock = 0; this.animTimeLast = 0; this.avatar = null; this.armature = null; this.morphs = []; this.mixer = null; this.speechQueue = []; this.isSpeaking = false; this.isRunning = false; this.stateName = 'idle'; this.audioCtx = new AudioContext(); this.audioSpeechSource = null; this.lipsync = {}; this.visemeNames = ['viseme_sil', 'viseme_PP', 'viseme_FF', 'viseme_TH', 'viseme_DD', 'viseme_kk', 'viseme_CH', 'viseme_SS', 'viseme_nn', 'viseme_RR', 'viseme_aa', 'viseme_E', 'viseme_I', 'viseme_O', 'viseme_U']; this.poseTemplates = { 'side': { standing: true, props: { 'Hips.position': { x: 0, y: 1, z: 0 }, 'Hips.rotation': { x: -0.003, y: -0.017, z: 0.1 }, 'Spine.rotation': { x: -0.103, y: -0.002, z: -0.063 }, 'Spine1.rotation': { x: 0.042, y: -0.02, z: -0.069 }, 'Spine2.rotation': { x: 0.131, y: -0.012, z: -0.065 }, 'Neck.rotation': { x: 0.027, y: 0.006, z: 0 }, 'Head.rotation': { x: 0.077, y: -0.065, z: 0 }, 'LeftShoulder.rotation': { x: 1.599, y: 0.084, z: -1.77 }, 'LeftArm.rotation': { x: 1.364, y: 0.052, z: -0.044 }, 'LeftForeArm.rotation': { x: 0.002, y: -0.007, z: 0.331 }, 'LeftHand.rotation': { x: 0.104, y: -0.067, z: -0.174 }, 'LeftUpLeg.rotation': { x: 0.096, y: 0.209, z: 2.983 }, 'LeftLeg.rotation': { x: -0.053, y: 0.042, z: -0.017 }, 'LeftFoot.rotation': { x: 1.091, y: 0.15, z: 0.026 }, 'RightShoulder.rotation': { x: 1.541, y: 0.192, z: 1.775 }, 'RightArm.rotation': { x: 1.273, y: -0.352, z: -0.067 }, 'RightForeArm.rotation': { x: -0.011, y: -0.031, z: -0.357 }, 'RightHand.rotation': { x: -0.008, y: 0.312, z: -0.028 }, 'RightUpLeg.rotation': { x: -0.307, y: -0.219, z: 2.912 }, 'RightLeg.rotation': { x: -0.359, y: 0.164, z: 0.015 }, 'RightFoot.rotation': { x: 1.035, y: 0.11, z: 0.005 } } }, 'straight': { standing: true, props: { 'Hips.position': { x: 0, y: 0.989, z: 0.001 }, 'Hips.rotation': { x: 0.047, y: 0.007, z: -0.007 }, 'Spine.rotation': { x: -0.143, y: -0.007, z: 0.005 }, 'Spine1.rotation': { x: -0.043, y: -0.014, z: 0.012 }, 'Spine2.rotation': { x: 0.072, y: -0.013, z: 0.013 }, 'Neck.rotation': { x: 0.048, y: -0.003, z: 0.012 }, 'Head.rotation': { x: 0.05, y: -0.02, z: -0.017 }, 'LeftShoulder.rotation': { x: 1.62, y: -0.166, z: -1.605 }, 'LeftArm.rotation': { x: 1.275, y: 0.544, z: -0.092 }, 'LeftForeArm.rotation': { x: 0, y: 0, z: 0.302 }, 'LeftHand.rotation': { x: -0.225, y: -0.154, z: 0.11 }, 'RightShoulder.rotation': { x: 1.615, y: 0.064, z: 1.53 }, 'RightArm.rotation': { x: 1.313, y: -0.424, z: 0.131 }, 'RightForeArm.rotation': { x: 0, y: 0, z: -0.317 }, 'RightHand.rotation': { x: -0.158, y: -0.639, z: -0.196 }, 'LeftUpLeg.rotation': { x: -0.077, y: -0.058, z: 3.126 }, 'LeftLeg.rotation': { x: -0.252, y: 0.001, z: -0.018 }, 'LeftFoot.rotation': { x: 1.315, y: -0.064, z: 0.315 }, 'RightUpLeg.rotation': { x: -0.083, y: -0.032, z: 3.124 }, 'RightLeg.rotation': { x: -0.272, y: -0.003, z: 0.021 }, 'RightFoot.rotation': { x: 1.342, y: 0.076, z: -0.222 } } } }; this.animMoods = { neutral: { anims: [{ name: 'breathing', loop: -1, delay: 1500, dt: [1200, 500, 1000], vs: { chestInhale: [0.5, 0.5, 0] } }, { name: 'pose', loop: -1, alt: [{ p: 0.4, delay: [5000, 20000], dt: [2000], vs: { pose: ['side'] } }, { delay: [5000, 20000], dt: [2000], vs: { pose: ['straight'] } }] }, { name: 'head', loop: -1, idle: { delay: [0, 1000], dt: [[200, 5000]], vs: { headRotateX: [[-0.04, 0.10]], headRotateY: [[-0.3, 0.3]], headRotateZ: [[-0.08, 0.08]] } }, talking: { delay: [0, 1000], dt: [[0, 1000, 0]], vs: { headRotateX: [[-0.05, 0.15, 1, 2]], headRotateY: [[-0.1, 0.1]], headRotateZ: [[-0.1, 0.1]] } } }, { name: 'eyes', loop: -1, delay: [200, 5000], dt: [[100, 500], [100, 5000, 2]], vs: { eyesRotateY: [[-0.6, 0.6]], eyesRotateX: [[-0.2, 0.6]] } }, { name: 'blink', loop: -1, delay: [1000, 8000], dt: [50, [100, 300], 100], vs: { eyeBlinkLeft: [1, 1, 0], eyeBlinkRight: [1, 1, 0] } }, { name: 'mouth', loop: -1, delay: [1000, 5000], dt: [[100, 500], [100, 5000, 2]], vs: { mouthRollLower: [[0, 0.3, 2]], mouthPucker: [[0, 0.3]] } }] } }; this.animEmojis = { '😊': { name: 'smile', dt: [300, 1000], vs: { mouthSmile: [0.7], eyeSquintLeft: [0.8], eyeSquintRight: [0.8] } }, '😉': { name: 'wink', dt: [100, 200, 500], vs: { mouthSmile: [0.5, 0.5, 0], eyeBlinkRight: [1, 1, 0] } }, '😞': { name: 'sad', dt: [1000], vs: { browInnerUp: [0.7], mouthFrownLeft: [0.8], mouthFrownRight: [0.8] } }, '😡': { name: 'angry', dt: [500], vs: { browDownLeft: [1], browDownRight: [1], mouthFrownLeft: [1], mouthFrownRight: [1] } } }; this.animQueue = []; this.easing = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; this.poseBase = {}; this.poseTarget = {}; this.poseAvatar = {}; this.poseDelta = { props: {} }; this.poseWeightOnLeft = true; this.randomized = ['mouthStretchLeft', 'mouthStretchRight', 'mouthRollLower', 'mouthRollUpper', 'browDownLeft', 'browDownRight', 'browOuterUpLeft', 'browOuterUpRight', 'cheekPuff', 'cheekSquintLeft', 'cheekSquintRight']; this.animBaseline = {}; this.ikMesh = new THREE.SkinnedMesh(); window.addEventListener('resize', this.onResize.bind(this)); this.envLoaded = false; }
             resumeAudio() { if (this.audioCtx && this.audioCtx.state === 'suspended') { this.audioCtx.resume(); } }
@@ -605,13 +674,13 @@
             stopSpeaking() { if (this.audioSpeechSource) { this.audioSpeechSource.onended = null; this.audioSpeechSource.stop(); this.audioSpeechSource = null; } this.speechQueue = []; this.finishSpeaking(); }
             speakWithHands(delay = 0, prob = 0.5) { if (Math.random() > prob) return; const dt = [100 + Math.round(Math.random() * 500)]; const moveto = [{ duration: 1000, props: { "LeftHand.rotation": { x: 0, y: -1 - Math.random(), z: 0 }, "RightHand.rotation": { x: 0, y: 1 + Math.random(), z: 0 }, "LeftArm.rotation": { x: 1.5, y: 0, z: 0 }, "RightArm.rotation": { x: 1.5, y: 0, z: 0 }, "LeftForeArm.rotation": { x: 0, y: 0, z: 1 }, "RightForeArm.rotation": { x: 0, y: 0, z: -1 }, } }]; dt.push(1000 + Math.round(Math.random() * 500)); moveto.push({ duration: 2000, props: {} });["LeftArm", "LeftForeArm", "RightArm", "RightForeArm", "LeftHand", "RightHand"].forEach(x => { moveto[1].props[x + '.rotation'] = null; }); const anim = this.animFactory({ name: 'talkinghands', delay: delay, dt: dt, vs: { moveto: moveto } }); this.animQueue.push(anim); }
         }
-        // --- END OF UNABRIDGED TALKINGHEAD CLASS ---
 
-        // --- Application State & Constants ---
+
+
         let avatar, isModelLoaded = false, messages = [], isRecording = false, speechRecognition, isWaitingForAIResponse = false;
         let deckgl, isSelectingArea = false, selectionStart = null;
 
-        // TODO: UPDATE THIS URL TO YOUR DEPLOYED WORKER URL
+
         const BACKEND_URL = 'https://oceanographybot.bhansalimanan55.workers.dev/';
         const TTS_ENDPOINT = 'https://us-central1-msc-notif.cloudfunctions.net/gcp-tts-rate-limited';
         const AVATAR_URL = 'https://models.readyplayer.me/69440c84ca696e5f2fb7bfd5.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown';
@@ -701,9 +770,8 @@ CRITICAL INSTRUCTIONS:
                 const colorScale = d3.scaleSequential(d3.interpolateViridis).domain(domain);
                 const Z_SCALE = config.metadata.zScale || 1; // Vertical exaggeration
 
-                // 1. Line Layer (The Profile Trace)
-                // We need to construct a path. Scatterplot config.data is array of points.
-                // We must sort by depth to draw a clean line.
+
+
                 const sortedData = [...config.data].sort((a, b) => a.pressure - b.pressure);
                 const pathData = [{
                     path: sortedData.map(d => [d.position[0], d.position[1], d.pressure * Z_SCALE]),
@@ -720,22 +788,22 @@ CRITICAL INSTRUCTIONS:
                     pickable: false
                 });
 
-                // 2. Scatterplot Layer (The Data Points)
+
                 dataLayer = new deck.ScatterplotLayer({
                     id: 'profile-scatterplot',
                     data: config.data,
-                    // Project UPWARDS (positive Z) for visibility "Sky Scraper" style
+
                     getPosition: d => [d.position[0], d.position[1], d.pressure * Z_SCALE],
                     getFillColor: d => {
                         const c = d3.color(colorScale(d.value));
                         return [c.r, c.g, c.b, 255];
                     },
-                    getRadius: 5, // constant physical size
+                    getRadius: 5,
                     radiusMinPixels: 5,
                     radiusMaxPixels: 20,
                     pickable: true
                 });
-                // Combine layers
+
                 deckgl.setProps({ layers: [baseMapLayer, lineLayer, dataLayer].filter(Boolean) });
 
             } else if (config.layerType === 'scatterplot_locations') {
@@ -747,9 +815,9 @@ CRITICAL INSTRUCTIONS:
                     initialViewState: {
                         longitude: config.metadata.lon,
                         latitude: config.metadata.lat,
-                        zoom: 8, // Zoom in closer for deep dive
-                        pitch: 60, // Higher pitch to see the "Tower"
-                        bearing: 30, // Slight angle
+                        zoom: 8,
+                        pitch: 60,
+                        bearing: 30,
                         transitionDuration: 2000,
                         transitionInterpolator: new deck.FlyToInterpolator()
                     }
@@ -774,7 +842,7 @@ CRITICAL INSTRUCTIONS:
                 dom.appContainer.classList.add('loaded');
                 setTimeout(() => avatar && avatar.onResize(), 50);
 
-                // Initialize text history with System Prompt
+
                 messages = [{ role: 'system', content: SYSTEM_PROMPT }];
 
                 const welcomeMessage = "Hello! I'm Mike. I can find ARGO floats by name, like 'find floats near Japan', or you can use the grid button on the map to select an area visually. What would you like to explore? 😊";
@@ -812,14 +880,14 @@ CRITICAL INSTRUCTIONS:
                 const allData = await response.json();
 
                 if (allData.length === 0) return { summary: `I searched the area but found no active ARGO floats.`, visualization: null };
-                const results = allData.slice(0, 20); // Cap for performance
+                const results = allData.slice(0, 20);
 
-                // DATA PARSING FIX: Argovis 'minimal' compression returns arrays: [ID, lon, lat, date, source, key]
+
                 const deckData = results.map(f => {
                     if (Array.isArray(f)) {
                         return { position: [f[1], f[2]], platform: f[0].split('_')[0] };
                     }
-                    return { position: [f.lon, f.lat], platform: f.platform_number }; // Fallback for object format
+                    return { position: [f.lon, f.lat], platform: f.platform_number };
                 });
 
                 const boxCoords = JSON.parse(args.box);
@@ -839,7 +907,7 @@ CRITICAL INSTRUCTIONS:
             },
 
             deep_dive_analysis: async (args) => {
-                // Step 1: Get list of profiles (lightweight)
+
                 const metaParams = new URLSearchParams({ platform: args.platform_id, compression: 'minimal' });
                 const metaUrl = `https://argovis-api.colorado.edu/argo?${metaParams.toString()}`;
 
@@ -849,14 +917,12 @@ CRITICAL INSTRUCTIONS:
 
                 if (metaData.length === 0) throw new Error(`No profiles found for float ${args.platform_id}.`);
 
-                // Step 2: Find latest profile
-                // Format: [id, lon, lat, date, source, key]
-                // Sort descending by date (index 3)
+
+
                 metaData.sort((a, b) => new Date(b[3]) - new Date(a[3]));
                 const latestProfileID = metaData[0][0];
 
-                // Step 3: Fetch full data for THIS profile
-                // FIX: Use simple comma-separated string for data fields, and use standard names (temperature, salinity, pressure)
+
                 const dataParams = new URLSearchParams({
                     id: latestProfileID,
                     data: 'temperature,salinity,pressure'
@@ -870,13 +936,12 @@ CRITICAL INSTRUCTIONS:
                 if (data.length === 0) throw new Error(`No data found for profile ${latestProfileID}.`);
 
                 const firstProfile = data[0];
-                // API data matrix is Column-Major: [[temp1, temp2...], [psal1, psal2...], [pres1, pres2...]]
-                // NOT Row-Major.
+
                 const temps = firstProfile.data[0];
                 const psals = firstProfile.data[1];
                 const press = firstProfile.data[2];
 
-                // Determine which array is our target value
+
                 const values = args.data_type === 'temperature' ? temps : psals;
 
                 if (!values || !press || values.length !== press.length) {
@@ -884,7 +949,7 @@ CRITICAL INSTRUCTIONS:
                 }
 
                 const deckData = values.map((val, i) => ({
-                    // Use POSITIVE pressure for "Sky Tower" visualization logic
+
                     position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], press[i]],
                     value: val,
                     pressure: press[i]
@@ -914,12 +979,12 @@ CRITICAL INSTRUCTIONS:
             }
         }
 
-        // CRITICAL FIX: Robust State Management & Recursion
+
         async function sendToAI(message) {
-            // Prevent user from clicking while busy (debounce), but allow recursion
+
             if (isWaitingForAIResponse && !message.tool_response && message.role !== 'function') return;
 
-            // Lock UI if this is a user action
+
             if (!message.tool_response && message.role !== 'function') isWaitingForAIResponse = true;
 
             messages.push(message);
@@ -933,7 +998,7 @@ CRITICAL INSTRUCTIONS:
                 if (!workerResponse.ok) throw new Error(`Worker API Error: ${workerResponse.status}`);
                 const data = await workerResponse.json();
 
-                // 1. Handle Text Response (Speak FIRST if available)
+
                 if (data.response) {
                     addChatMessage('ai', 'Mike', data.response);
                     messages.push({ role: 'model', content: data.response });
@@ -941,33 +1006,32 @@ CRITICAL INSTRUCTIONS:
                     if (avatar) { emojis.slice(0, 3).forEach((e, i) => { const known = avatar.animEmojis[e] ? e : '😊'; setTimeout(() => avatar.speakEmoji(known), i * 400); }); avatar.speakText(clean); }
                 }
 
-                // 2. Handle Tool Call
+
                 if (data.functionCall) {
                     renderDebugLog([{ type: 'tool_call', content: `Agent wants to call: ${data.functionCall.name}`, data: data.functionCall.args }]);
 
                     setAgentStatus("Mike is consulting the live map...");
 
-                    // Add Model Intent to History (CRITICAL: Saves "I want to call X")
+
                     messages.push({
                         role: 'model',
                         tool_calls: [{ name: data.functionCall.name, args: data.functionCall.args }]
                     });
 
-                    // Execute Tool
+
                     const tool_function = client_tools[data.functionCall.name];
                     const full_tool_result = await tool_function(data.functionCall.args);
 
-                    // Handle Visualization Locally
+
                     let contentToSendToLLM = full_tool_result.summary || JSON.stringify(full_tool_result);
                     if (full_tool_result.visualization) {
                         // Enhance config for better rendering
-                        full_tool_result.visualization.metadata.zScale = 50; // Exaggerate height
+                        full_tool_result.visualization.metadata.zScale = 50;
                         renderVisualization(full_tool_result.visualization);
                         contentToSendToLLM += " (Visualization rendered on map. Note: Depth is projected upwards for visibility.)";
                     }
 
-                    // RECURSE: Send result back to AI
-                    // We use standard format: role: 'function', tool_name: 'tool_name', tool_response: 'result'
+
                     await sendToAI({
                         role: 'function',
                         tool_name: data.functionCall.name,
@@ -981,9 +1045,7 @@ CRITICAL INSTRUCTIONS:
                 addChatMessage('ai', 'System', 'I encountered an error. Please check the debug log and console for details.');
                 renderDebugLog([{ type: 'error', content: error.stack }]);
             } finally {
-                // UNLOCK UI & HIDE STATUS
-                // Only if we are not in a recursive stack depth (top level) OR if we are returning from recursion
-                // Since we await the recursion, we can clear status here.
+
                 setAgentStatus(null);
                 isWaitingForAIResponse = false;
             }
