@@ -870,16 +870,24 @@ CRITICAL INSTRUCTIONS:
                 if (data.length === 0) throw new Error(`No data found for profile ${latestProfileID}.`);
 
                 const firstProfile = data[0];
-                // Map visualization variable based on user request ('temperature' or 'salinity')
-                // API data matrix order: [temperature, salinity, pressure]
-                const variableIdx = args.data_type === 'temperature' ? 0 : 1;
-                const pressureIdx = 2; // Pressure is always last requested
+                // API data matrix is Column-Major: [[temp1, temp2...], [psal1, psal2...], [pres1, pres2...]]
+                // NOT Row-Major.
+                const temps = firstProfile.data[0];
+                const psals = firstProfile.data[1];
+                const press = firstProfile.data[2];
 
-                const deckData = firstProfile.data.map(m => ({
-                    // Use POSITIVE pressure for "Sky Tower" visualization logic in renderer
-                    position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], m[pressureIdx]],
-                    value: m[variableIdx],
-                    pressure: m[pressureIdx]
+                // Determine which array is our target value
+                const values = args.data_type === 'temperature' ? temps : psals;
+
+                if (!values || !press || values.length !== press.length) {
+                    throw new Error("Data arrays mismatch or empty.");
+                }
+
+                const deckData = values.map((val, i) => ({
+                    // Use POSITIVE pressure for "Sky Tower" visualization logic
+                    position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], press[i]],
+                    value: val,
+                    pressure: press[i]
                 }));
 
                 return {
