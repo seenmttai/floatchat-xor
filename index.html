@@ -5,6 +5,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FloatChat - AI Ocean Data Explorer</title>
+    <style>
+        .agent-status {
+            position: fixed;
+            top: 5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(16, 185, 129, 0.9);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .agent-status.hidden {
+            opacity: 0;
+            transform: translate(-50%, -10px);
+            pointer-events: none;
+        }
+
+        .agent-status-icon {
+            animation: spin 2s linear infinite;
+        }
+    </style>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E🌊%3C/text%3E%3C/svg%3E">
@@ -471,6 +502,14 @@
     </div>
     <div id="app-container" class="app-container">
         <header class="app-header">FloatChat - AI Ocean Data Agent</header>
+        <div id="agent-status" class="agent-status hidden">
+            <svg class="agent-status-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <path
+                    d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+            </svg>
+            <span id="agent-status-text">Mike is thinking...</span>
+        </div>
         <main class="main-content">
             <div id="map"></div>
             <div id="selection-box" class="hidden"></div>
@@ -582,7 +621,35 @@
         function extractEmojisAndSanitize(text = "") { const chars = Array.from(text); const emojis = []; const noEmoji = chars.map(ch => { if (EMOJI_CHAR.test(ch)) { emojis.push(ch); return ""; } return ch; }).join(""); let clean = noEmoji.replace(NON_TTS, "").replace(/\s{2,}/g, " ").trim(); return { clean, emojis }; }
         function sanitizeForTTS(s) { return extractEmojisAndSanitize(s).clean; }
 
-        const dom = { loadingScreen: document.getElementById('loading-screen'), appContainer: document.getElementById('app-container'), avatarContainer: document.getElementById('avatar-container'), chatMessages: document.getElementById('chat-messages'), subtitlesOverlay: document.getElementById('subtitles-overlay'), pushToTalkBtn: document.getElementById('push-to-talk-btn'), speechStatus: document.getElementById('speech-status'), debugPane: document.getElementById('debug-content'), endSessionBtn: document.getElementById('end-session-btn'), tabs: document.querySelectorAll('.tab-btn'), tabPanes: document.querySelectorAll('.tab-pane'), selectAreaBtn: document.getElementById('select-area-btn'), selectionBox: document.getElementById('selection-box') };
+        const SYSTEM_PROMPT = `
+You are Mike, an expert oceanographer AI agent powered by advanced tools.
+Your goal is to assist users in exploring ocean data using ARGO floats.
+
+CRITICAL INSTRUCTIONS:
+1. **Always** use the provided tools to fetch real data. Do not guess locations or data values.
+2. **State Persistence**: If you call a tool, you MUST use the result in your subsequent response.
+3. **Visualization**: If a tool returns a visualization, explicitely mention "I've rendered the data on the map" in your final response.
+4. **Persistence**: If a tool fails (returns empty), try a broader search or ask the user for clarification. Do not stop until you have an answer or a clear path forward.
+5. **Tone**: Be helpful, professional, yet conversational.
+        `.trim();
+
+        const dom = {
+            loadingScreen: document.getElementById('loading-screen'),
+            appContainer: document.getElementById('app-container'),
+            avatarContainer: document.getElementById('avatar-container'),
+            chatMessages: document.getElementById('chat-messages'),
+            subtitlesOverlay: document.getElementById('subtitles-overlay'),
+            pushToTalkBtn: document.getElementById('push-to-talk-btn'),
+            speechStatus: document.getElementById('speech-status'),
+            debugPane: document.getElementById('debug-content'),
+            endSessionBtn: document.getElementById('end-session-btn'),
+            tabs: document.querySelectorAll('.tab-btn'),
+            tabPanes: document.querySelectorAll('.tab-pane'),
+            selectAreaBtn: document.getElementById('select-area-btn'),
+            selectionBox: document.getElementById('selection-box'),
+            agentStatus: document.getElementById('agent-status'),
+            agentStatusText: document.getElementById('agent-status-text')
+        };
         let interimTranscript = '', finalTranscript = '';
 
         async function init() {
@@ -649,7 +716,22 @@
         function stopRecording() { if (!isRecording) return; isRecording = false; dom.pushToTalkBtn.classList.remove('recording'); if (speechRecognition) try { speechRecognition.stop(); } catch (e) { } }
         function handleSpeechInput(transcript) { addChatMessage('user', 'You', transcript); sendToAI({ role: 'user', content: transcript }); }
         async function loadModelInBackground() { try { avatar = new TalkingHead(dom.avatarContainer, { ttsEndpoint: TTS_ENDPOINT, cameraView: 'upper' }); await avatar.init(); await avatar.showAvatar({ url: AVATAR_URL }); isModelLoaded = true; startSession(); } catch (error) { document.querySelector('.loading-text').textContent = 'Error loading 3D model.'; } }
-        async function startSession() { dom.loadingScreen.style.opacity = 0; setTimeout(() => { dom.loadingScreen.classList.add('hidden'); dom.appContainer.classList.add('loaded'); setTimeout(() => avatar && avatar.onResize(), 50); const welcomeMessage = "Hello! I'm Mike. I can find ARGO floats by name, like 'find floats near Japan', or you can use the grid button on the map to select an area visually. What would you like to explore? 😊"; addChatMessage('ai', 'Mike', welcomeMessage); messages.push({ role: 'model', content: welcomeMessage }); if (avatar) avatar.speakText(welcomeMessage); }, 500); }
+        async function startSession() {
+            dom.loadingScreen.style.opacity = 0;
+            setTimeout(() => {
+                dom.loadingScreen.classList.add('hidden');
+                dom.appContainer.classList.add('loaded');
+                setTimeout(() => avatar && avatar.onResize(), 50);
+
+                // Initialize text history with System Prompt
+                messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+
+                const welcomeMessage = "Hello! I'm Mike. I can find ARGO floats by name, like 'find floats near Japan', or you can use the grid button on the map to select an area visually. What would you like to explore? 😊";
+                addChatMessage('ai', 'Mike', welcomeMessage);
+                messages.push({ role: 'model', content: welcomeMessage });
+                if (avatar) avatar.speakText(welcomeMessage);
+            }, 500);
+        }
         function addChatMessage(type, author, content) { const msg = document.createElement('div'); msg.className = `message ${type}`; msg.innerHTML = `<div class="message-author">${author}</div><div class="message-content">${content.replace(/<<<.+>>>/s, '')}</div>`; dom.chatMessages.appendChild(msg); dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight; }
         function renderDebugLog(log) { if (!log) { dom.debugPane.innerHTML = 'No debug info.'; return; } let html = ''; log.forEach(entry => { const dataHtml = entry.data ? `<pre class="debug-data">${JSON.stringify(entry.data, null, 2)}</pre>` : ''; html += `<div class="debug-entry ${entry.type}"><div class="debug-title">${entry.type.replace('_', ' ').toUpperCase()}</div><div class="debug-content">${entry.content}</div>${dataHtml}</div>`; }); dom.debugPane.innerHTML = html; }
 
@@ -699,17 +781,26 @@
             deep_dive_analysis: async (args) => { const params = new URLSearchParams({ platform_number: args.platform_id, data: '["TEMP_ADJUSTED","PSAL_ADJUSTED","PRES_ADJUSTED"]' }); const url = `https://argovis-api.colorado.edu/argo?${params.toString()}`; const response = await fetch(url); if (!response.ok) throw new Error(`Argovis API returned status ${response.status}`); const data = await response.json(); if (data.length === 0) throw new Error(`No data found for float ID ${args.platform_id}.`); const firstProfile = data[0]; const variable = args.data_type === 'temperature' ? 'TEMP_ADJUSTED' : 'PSAL_ADJUSTED'; const deckData = firstProfile.measurements.map(m => ({ position: [firstProfile.geolocation.coordinates[0], firstProfile.geolocation.coordinates[1], -m.PRES_ADJUSTED], value: m[variable], pressure: m.PRES_ADJUSTED })); return { summary: `Found ${deckData.length} data points for float ${args.platform_id}.`, visualization: { layerType: 'scatterplot_profile', data: deckData, metadata: { lon: firstProfile.geolocation.coordinates[0], lat: firstProfile.geolocation.coordinates[1], title: `${args.data_type} Profile` } } }; }
         };
 
+        function setAgentStatus(text) {
+            if (!text) {
+                dom.agentStatus.classList.add('hidden');
+            } else {
+                dom.agentStatusText.textContent = text;
+                dom.agentStatus.classList.remove('hidden');
+            }
+        }
+
         // CRITICAL FIX: Robust State Management & Recursion
         async function sendToAI(message) {
             // Prevent user from clicking while busy (debounce), but allow recursion
-            if (isWaitingForAIResponse && !message.tool_response) return;
+            if (isWaitingForAIResponse && !message.tool_response && message.role !== 'function') return;
 
             // Lock UI if this is a user action
-            if (!message.tool_response) isWaitingForAIResponse = true;
+            if (!message.tool_response && message.role !== 'function') isWaitingForAIResponse = true;
 
             messages.push(message);
 
-            if (!message.tool_response) {
+            if (!message.tool_response && message.role !== 'function') {
                 renderDebugLog([{ type: 'info', content: 'Sending message to agent...' }]);
             }
 
@@ -730,7 +821,9 @@
                 if (data.functionCall) {
                     renderDebugLog([{ type: 'tool_call', content: `Agent wants to call: ${data.functionCall.name}`, data: data.functionCall.args }]);
 
-                    // Add Model Intent to History
+                    setAgentStatus("Mike is consulting the live map...");
+
+                    // Add Model Intent to History (CRITICAL: Saves "I want to call X")
                     messages.push({
                         role: 'model',
                         tool_calls: [{ name: data.functionCall.name, args: data.functionCall.args }]
@@ -748,12 +841,12 @@
                     }
 
                     // RECURSE: Send result back to AI
-                    // We AWAIT this to ensure the `finally` block doesn't unlock too early
+                    // We use standard format: role: 'function', name: 'tool_name', content: 'result'
                     await sendToAI({
                         role: 'function',
-                        content: '',
-                        tool_response: contentToSendToLLM,
-                        tool_name: data.functionCall.name
+                        name: data.functionCall.name,
+                        content: contentToSendToLLM,
+                        tool_response: true
                     });
                 }
 
@@ -762,12 +855,14 @@
                 addChatMessage('ai', 'System', 'I encountered an error. Please check the debug log and console for details.');
                 renderDebugLog([{ type: 'error', content: error.stack }]);
             } finally {
-                // UNLOCK UI: Only if we are not in a recursive stack depth, 
-                // OR if the recursion finished successfully.
-                // Since we await the recursion above, we can safely unlock here.
+                // UNLOCK UI & HIDE STATUS
+                // Only if we are not in a recursive stack depth (top level) OR if we are returning from recursion
+                // Since we await the recursion, we can clear status here.
+                setAgentStatus(null);
                 isWaitingForAIResponse = false;
             }
         }
+
         function endSession() { if (confirm('End session?')) { location.reload(); } }
 
         init();
