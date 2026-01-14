@@ -614,7 +614,7 @@
         // TODO: UPDATE THIS URL TO YOUR DEPLOYED WORKER URL
         const BACKEND_URL = 'https://oceanographybot.bhansalimanan55.workers.dev/';
         const TTS_ENDPOINT = 'https://us-central1-msc-notif.cloudfunctions.net/gcp-tts-rate-limited';
-        const AVATAR_URL = 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=Oculus+Visemes';
+        const AVATAR_URL = 'https://models.readyplayer.me/69440c84ca696e5f2fb7bfd5.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown';
 
         let EMOJI_CHAR, NON_TTS;
         try { EMOJI_CHAR = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u; NON_TTS = /[^\p{L}\p{N}\p{P}\p{Z}\n\r\t]/gu; } catch { EMOJI_CHAR = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u; NON_TTS = /[^A-Za-z0-9\s.,!?;:'"()[\]{}<>@#$%^&*_\-+=/\\|~`]/g; }
