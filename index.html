@@ -763,7 +763,14 @@ CRITICAL INSTRUCTIONS:
                 if (allData.length === 0) return { summary: `I searched the area but found no active ARGO floats.`, visualization: null };
                 const results = allData.slice(0, 20); // Cap for performance
 
-                const deckData = results.map(f => ({ position: [f.lon, f.lat], platform: f.platform_number }));
+                // DATA PARSING FIX: Argovis 'minimal' compression returns arrays: [ID, lon, lat, date, source, key]
+                const deckData = results.map(f => {
+                    if (Array.isArray(f)) {
+                        return { position: [f[1], f[2]], platform: f[0].split('_')[0] };
+                    }
+                    return { position: [f.lon, f.lat], platform: f.platform_number }; // Fallback for object format
+                });
+
                 const boxCoords = JSON.parse(args.box);
                 const centerLon = (boxCoords[0][0] + boxCoords[1][0]) / 2;
                 const centerLat = (boxCoords[0][1] + boxCoords[1][1]) / 2;
