@@ -841,12 +841,11 @@ CRITICAL INSTRUCTIONS:
                     }
 
                     // RECURSE: Send result back to AI
-                    // We use standard format: role: 'function', name: 'tool_name', content: 'result'
+                    // We use standard format: role: 'function', tool_name: 'tool_name', tool_response: 'result'
                     await sendToAI({
                         role: 'function',
-                        name: data.functionCall.name,
-                        content: contentToSendToLLM,
-                        tool_response: true
+                        tool_name: data.functionCall.name,
+                        tool_response: contentToSendToLLM
                     });
                 }
 
